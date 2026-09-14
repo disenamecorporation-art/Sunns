@@ -1,0 +1,6 @@
+{
+  "name": "Sunns Shop",
+  "description": "Tienda premium online de lentes de sol y ópticos con diseño minimalista y sofisticado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
