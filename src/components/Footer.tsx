@@ -6,14 +6,22 @@
 import React, { useState } from 'react';
 import { Glasses, Instagram, Facebook, Twitter, ShieldCheck, Mail, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
 interface FooterProps {
   setView: (view: string) => void;
   setSelectedCategory: (category: string) => void;
   scrollToSection: (id: string) => void;
+  homeContent?: HomeContent;
 }
 
-export default function Footer({ setView, setSelectedCategory, scrollToSection }: FooterProps) {
+export default function Footer({ 
+  setView, 
+  setSelectedCategory, 
+  scrollToSection,
+  homeContent = DEFAULT_HOME_CONTENT 
+}: FooterProps) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -56,7 +64,7 @@ export default function Footer({ setView, setSelectedCategory, scrollToSection }
             </div>
             
             <p className="text-xs text-[#f5f0e6]/65 leading-relaxed font-light max-w-sm">
-              Artesanía atemporal y perfiles contemporáneos. Diseñamos lentes premium pulidos individualmente a mano con finos acetatos biodegradables para vestir cada mirada con distinción.
+              {homeContent.footerBrandDescription || 'Artesanía atemporal y perfiles contemporáneos. Diseñamos lentes premium pulidos individualmente a mano con finos acetatos biodegradables para vestir cada mirada con distinción.'}
             </p>
 
             {/* Social Icons */}
@@ -76,10 +84,10 @@ export default function Footer({ setView, setSelectedCategory, scrollToSection }
           {/* Newsletter Signup Form */}
           <div className="lg:col-span-7 space-y-4">
             <span className="text-[10px] tracking-[0.3em] text-[#f5f0e6] uppercase font-bold block">
-              SUSCRÍBETE A NUESTRA NEWSLETTER
+              {homeContent.footerNewsletterTag || 'SUSCRÍBETE A NUESTRA NEWSLETTER'}
             </span>
             <p className="text-xs text-[#f5f0e6]/70 font-light max-w-xl leading-relaxed">
-              Únete a nuestro club exclusivo. Recibe invitaciones a ventas privadas de stock limitado, lanzamientos editoriales y un <strong>10% de descuento de cortesía</strong> en tu primera compra.
+              {homeContent.footerNewsletterDescription || 'Únete a nuestro club exclusivo. Recibe invitaciones a ventas privadas de stock limitado, lanzamientos editoriales y un 10% de descuento de cortesía en tu primera compra.'}
             </p>
             
             <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 pt-2 max-w-lg">
@@ -216,15 +224,15 @@ export default function Footer({ setView, setSelectedCategory, scrollToSection }
             <ul className="space-y-2.5 font-light text-[#f5f0e6]/70">
               <li>
                 <span className="block text-[#f5f0e6]/50">Atención telefónica:</span>
-                <span className="text-[#f5f0e6] font-medium">+1 (786) 825-9355</span>
+                <span className="text-[#f5f0e6] font-medium">{homeContent.footerPhone || '+1 (786) 825-9355'}</span>
               </li>
               <li>
                 <span className="block text-[#f5f0e6]/50">Soporte por email:</span>
-                <span className="text-[#f5f0e6] font-medium">Sunnsshop@icloud.com</span>
+                <span className="text-[#f5f0e6] font-medium">{homeContent.footerEmail || 'Sunnsshop@icloud.com'}</span>
               </li>
               <li>
                 <span className="block text-[#f5f0e6]/50">Showroom Central:</span>
-                <span className="text-[#f5f0e6] font-medium">Brickell Avenue, Miami, FL, USA</span>
+                <span className="text-[#f5f0e6] font-medium">{homeContent.footerAddress || 'Brickell Avenue, Miami, FL, USA'}</span>
               </li>
             </ul>
           </div>
@@ -234,7 +242,7 @@ export default function Footer({ setView, setSelectedCategory, scrollToSection }
         {/* Bottom copyright and legal notes */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-[#f5f0e6]/45 font-light">
           <div>
-            Sunns Shop © 2026. Todos los derechos reservados. Diseñado bajo estándares de lujo sostenible en Miami.
+            {homeContent.footerCopyright || 'Sunns Shop © 2026. Todos los derechos reservados. Diseñado bajo estándares de lujo sostenible en Miami.'}
           </div>
           <div className="flex space-x-6">
             <a href="#" className="hover:text-white transition-colors">

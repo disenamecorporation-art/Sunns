@@ -6,12 +6,15 @@
 import React from 'react';
 import { ShieldCheck, Gem, Glasses, Package, ArrowRight } from 'lucide-react';
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'motion/react';
+import { HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
 interface HeroProps {
   setView: (view: string) => void;
+  homeContent?: HomeContent;
 }
 
-export default function Hero({ setView }: HeroProps) {
+export default function Hero({ setView, homeContent = DEFAULT_HOME_CONTENT }: HeroProps) {
   const { scrollY } = useScroll();
   const yParallax = useTransform(scrollY, [0, 800], [0, 90]);
   const scaleParallax = useTransform(scrollY, [0, 800], [1, 1.03]);
@@ -47,29 +50,29 @@ export default function Hero({ setView }: HeroProps) {
   const pillars = [
     {
       icon: ShieldCheck,
-      title: 'Protección UV400',
-      desc: 'Bloqueo 100% rayos solares',
+      title: homeContent.heroPillar1Title || 'Protección UV400',
+      desc: homeContent.heroPillar1Desc || 'Bloqueo 100% rayos solares',
     },
     {
       icon: Gem,
-      title: 'Calidad Premium',
-      desc: 'Materiales de alta gama',
+      title: homeContent.heroPillar2Title || 'Calidad Premium',
+      desc: homeContent.heroPillar2Desc || 'Materiales de alta gama',
     },
     {
       icon: Glasses,
-      title: 'Diseño Atemporal',
-      desc: 'Siluetas que perduran',
+      title: homeContent.heroPillar3Title || 'Diseño Atemporal',
+      desc: homeContent.heroPillar3Desc || 'Siluetas que perduran',
     },
     {
       icon: Package,
-      title: 'Devolución Fácil',
-      desc: '30 días de garantía',
+      title: homeContent.heroPillar4Title || 'Devolución Fácil',
+      desc: homeContent.heroPillar4Desc || '30 días de garantía',
     },
   ];
 
   return (
     <section 
-      className="relative w-full min-h-screen sm:min-h-[850px] lg:min-h-[920px] flex flex-col justify-between pt-24 pb-8 overflow-hidden bg-[#070504]"
+      className="relative w-full min-h-[100dvh] sm:min-h-[850px] lg:min-h-[920px] flex flex-col justify-between pt-20 sm:pt-24 pb-4 sm:pb-8 overflow-hidden bg-[#070504]"
       id="hero-section"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -101,9 +104,9 @@ export default function Hero({ setView }: HeroProps) {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: 'easeOut' }}
-          className="w-full max-w-[1550px] px-2 sm:px-6 flex items-center justify-between text-center font-hero-editorial leading-none tracking-[-0.04em] sm:tracking-[-0.02em]"
+          className="w-full max-w-[1550px] px-3 sm:px-6 flex items-center justify-between text-center font-hero-editorial leading-none tracking-[-0.03em] sm:tracking-[-0.02em]"
           style={{
-            fontSize: 'clamp(3.8rem, 12.8vw, 15.5rem)',
+            fontSize: 'clamp(2rem, 11.8vw, 15.5rem)',
           }}
         >
           {/* S: Solid Ivory */}
@@ -142,58 +145,57 @@ export default function Hero({ setView }: HeroProps) {
       </div>
 
       {/* 3. EDITORIAL FLOATING TEXT ELEMENTS */}
-      <div className="relative flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-between z-20 pointer-events-none pt-4 pb-2">
+      <div className="relative flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex flex-col justify-between z-20 pointer-events-none pt-2 sm:pt-4 pb-1 sm:pb-2">
         
         {/* Right side floating editorial text in Spanish */}
-        <div className="self-end pt-4 sm:pt-6 text-right text-[#f5f0e6] pointer-events-auto">
+        <div className="self-end pt-1 sm:pt-6 text-right text-[#f5f0e6] pointer-events-auto">
           <motion.div
             initial={{ opacity: 0, x: 25 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5, duration: 0.8 }}
-            className="space-y-3"
+            className="space-y-1 sm:space-y-3"
           >
             <div className="space-y-0.5">
-              <span className="text-[10px] sm:text-[11px] tracking-[0.3em] text-[#efeae0]/85 uppercase font-medium block">
-                MIRA EL MUNDO
+              <span className="text-[8px] sm:text-[11px] tracking-[0.25em] sm:tracking-[0.3em] text-[#efeae0]/85 uppercase font-medium block">
+                {homeContent.heroFloatingTitle1 || 'MIRA EL MUNDO'}
               </span>
-              <span className="text-[10px] sm:text-[11px] tracking-[0.3em] text-[#efeae0]/85 uppercase font-medium block">
-                A TRAVÉS DEL ESTILO
+              <span className="text-[8px] sm:text-[11px] tracking-[0.25em] sm:tracking-[0.3em] text-[#efeae0]/85 uppercase font-medium block">
+                {homeContent.heroFloatingTitle2 || 'A TRAVÉS DEL ESTILO'}
               </span>
             </div>
             
             <div>
-              <span className="text-[9px] sm:text-[10px] tracking-[0.25em] text-[#f5f0e6]/50 uppercase font-light block">
-                ALTA ÓPTICA DE AUTOR
+              <span className="text-[7px] sm:text-[10px] tracking-[0.2em] sm:tracking-[0.25em] text-[#f5f0e6]/50 uppercase font-light block">
+                {homeContent.heroFloatingSubtitle || 'ALTA ÓPTICA DE AUTOR'}
               </span>
             </div>
           </motion.div>
         </div>
 
-        {/* Left side editorial text positioned WAY LOWER near the bottom, with compact elegant typography so it NEVER touches SUNNSHOP */}
-        <div className="self-start max-w-xs text-[#f5f0e6] pointer-events-auto pb-4 sm:pb-6">
+        {/* Left side editorial text positioned LOWER near the bottom, with compact elegant typography so it NEVER touches SUNNSHOP */}
+        <div className="self-start max-w-[210px] sm:max-w-xs text-[#f5f0e6] pointer-events-auto pb-2 sm:pb-6">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            className="space-y-1.5 bg-black/40 sm:bg-black/20 backdrop-blur-md p-3.5 sm:p-4 rounded-xl border border-white/10"
+            className="space-y-1 sm:space-y-1.5 bg-black/40 sm:bg-black/20 backdrop-blur-md p-2.5 sm:p-4 rounded-xl border border-white/10 shadow-lg"
           >
-            <span className="text-[9px] sm:text-[10px] tracking-[0.35em] text-[#efeae0]/80 font-semibold uppercase block">
-              NUEVA COLECCIÓN
+            <span className="text-[8px] sm:text-[10px] tracking-[0.3em] sm:tracking-[0.35em] text-[#efeae0]/80 font-semibold uppercase block">
+              {homeContent.heroEditorialTag || 'NUEVA COLECCIÓN'}
             </span>
-            <h1 className="font-serif-elegant text-base sm:text-lg lg:text-xl font-bold leading-tight">
-              Diseño puro. <br />
-              Mirada eterna.
+            <h1 className="font-serif-elegant text-xs sm:text-lg lg:text-xl font-bold leading-tight whitespace-pre-line">
+              {homeContent.heroBottomTitle || 'Diseño puro.\nMirada eterna.'}
             </h1>
-            <p className="text-[11px] sm:text-xs text-[#f5f0e6]/75 leading-relaxed font-light max-w-[260px]">
-              Lentes esculpidos artesanalmente en finos acetatos y metales puros para quienes habitan el estilo.
+            <p className="text-[9px] sm:text-xs text-[#f5f0e6]/75 leading-relaxed font-light line-clamp-3 sm:line-clamp-none">
+              {homeContent.heroBottomDescription || 'Lentes esculpidos artesanalmente en finos acetatos y metales puros para quienes habitan el estilo.'}
             </p>
           </motion.div>
         </div>
 
       </div>
 
-      {/* 4. CENTRAL MODEL PHOTOGRAPHY (CLEAN, NO ARTIFACTS) */}
-      <div className="absolute inset-x-0 bottom-0 flex justify-center pointer-events-none z-10 h-[84vh] sm:h-[78vh] lg:h-[86vh] xl:h-[90vh] max-h-[640px] sm:max-h-[720px] lg:max-h-[860px] xl:max-h-[940px] overflow-hidden">
+      {/* 4. CENTRAL MODEL PHOTOGRAPHY (CLEAN, PROPORTIONAL ON ALL SCREENS) */}
+      <div className="absolute inset-x-0 bottom-0 flex justify-center pointer-events-none z-10 h-[72vh] sm:h-[78vh] lg:h-[86vh] xl:h-[90vh] max-h-[580px] sm:max-h-[720px] lg:max-h-[860px] xl:max-h-[940px] overflow-hidden">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -217,21 +219,21 @@ export default function Hero({ setView }: HeroProps) {
       </div>
 
       {/* 5. BOTTOM CTA & DISCOVER BUTTON WITH RADIANT GLIMMER / SHINE SWEEP EFFECT */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-30 mb-3 pointer-events-auto">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 z-30 mb-2 sm:mb-3 pointer-events-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45, duration: 0.8 }}
-          className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4"
+          className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4"
         >
-          <span className="text-[10px] tracking-[0.4em] text-[#efeae0]/80 font-semibold uppercase block">
-            ALTA ÓPTICA 2026
+          <span className="text-[8px] sm:text-[10px] tracking-[0.3em] sm:tracking-[0.4em] text-[#efeae0]/80 font-semibold uppercase block">
+            {homeContent.heroBottomSeason || 'ALTA ÓPTICA 2026'}
           </span>
           <motion.button
             onClick={() => setView('shop')}
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            className="group relative overflow-hidden inline-flex items-center gap-3 bg-white/[0.08] hover:bg-white/[0.16] text-[#f5f0e6] hover:text-white text-[10px] font-bold tracking-[0.25em] uppercase px-8 py-3.5 rounded-full backdrop-blur-2xl border border-white/40 hover:border-white/70 transition-all duration-300 cursor-pointer shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.25)]"
+            className="group relative overflow-hidden inline-flex items-center gap-2 sm:gap-3 bg-white/[0.08] hover:bg-white/[0.16] text-[#f5f0e6] hover:text-white text-[9px] sm:text-[10px] font-bold tracking-[0.2em] sm:tracking-[0.25em] uppercase px-4 sm:px-8 py-2.5 sm:py-3.5 rounded-full backdrop-blur-2xl border border-white/40 hover:border-white/70 transition-all duration-300 cursor-pointer shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.25)]"
             id="hero-quick-shop-btn"
           >
             {/* Super Glass Internal Ambient Reflection */}
@@ -280,35 +282,37 @@ export default function Hero({ setView }: HeroProps) {
             {/* Upper Glass Specular Curve / Top Rim Glow */}
             <div className="absolute top-0 inset-x-4 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none" />
 
-            <span className="relative z-10 font-semibold drop-shadow-sm">Descubrir Colección</span>
-            <ArrowRight className="relative z-10 w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-300 drop-shadow-sm text-white" />
+            <span className="relative z-10 font-semibold drop-shadow-sm">
+              {homeContent.heroCtaText || 'Descubrir Colección'}
+            </span>
+            <ArrowRight className="relative z-10 w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-1.5 transition-transform duration-300 drop-shadow-sm text-white" />
           </motion.button>
         </motion.div>
       </div>
 
       {/* 6. BOTTOM CONTINUOUS GLASS FEATURE BAR */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-30">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 z-30">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.8 }}
-          className="bg-white/[0.05] backdrop-blur-2xl border border-white/20 rounded-2xl md:rounded-3xl p-5 sm:p-6 lg:py-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+          className="bg-white/[0.05] backdrop-blur-2xl border border-white/20 rounded-2xl md:rounded-3xl p-3 sm:p-6 lg:py-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
         >
           {pillars.map((p, idx) => {
             const Icon = p.icon;
             return (
               <div 
                 key={idx} 
-                className="flex items-center gap-3.5 sm:gap-4 border-r border-white/15 last:border-0 pr-2 sm:pr-4"
+                className="flex items-center gap-2 sm:gap-4 border-r border-white/10 last:border-0 [&:nth-child(2)]:border-r-0 md:[&:nth-child(2)]:border-r pr-1 sm:pr-4"
               >
-                <div className="p-2 sm:p-2.5 rounded-xl shrink-0 text-white/90">
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.5]" />
+                <div className="p-1.5 sm:p-2.5 rounded-xl shrink-0 text-white/90">
+                  <Icon className="w-4 h-4 sm:w-6 sm:h-6 stroke-[1.5]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className="text-white text-xs sm:text-sm font-semibold tracking-wide">
+                  <h3 className="text-white text-[11px] sm:text-sm font-semibold tracking-wide">
                     {p.title}
                   </h3>
-                  <p className="text-white/60 text-[11px] sm:text-xs leading-tight font-light">
+                  <p className="text-white/60 text-[9px] sm:text-xs leading-tight font-light line-clamp-1 sm:line-clamp-none">
                     {p.desc}
                   </p>
                 </div>

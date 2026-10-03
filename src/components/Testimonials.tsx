@@ -7,8 +7,14 @@ import React from 'react';
 import { Star, Quote } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TESTIMONIALS } from '../data/products';
+import { HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
-export default function Testimonials() {
+interface TestimonialsProps {
+  homeContent?: HomeContent;
+}
+
+export default function Testimonials({ homeContent = DEFAULT_HOME_CONTENT }: TestimonialsProps) {
   return (
     <section className="py-24 bg-[#ffffff]" id="testimonials">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -16,10 +22,10 @@ export default function Testimonials() {
         {/* Section Header */}
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="text-[10px] tracking-[0.45em] text-black font-semibold uppercase block mb-3">
-            OPINIONES EDITORIALES
+            {homeContent.testimonialsTag || 'OPINIONES EDITORIALES'}
           </span>
           <h2 className="font-serif-elegant text-3xl sm:text-4xl font-bold text-black leading-tight">
-            La voz de quienes visten Sunns
+            {homeContent.testimonialsTitle || 'La voz de quienes visten Sunns'}
           </h2>
           <div className="w-12 h-[1.5px] bg-black mx-auto mt-4" />
         </div>

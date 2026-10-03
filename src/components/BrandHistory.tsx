@@ -6,8 +6,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Check, Sparkles, MessageSquare, Compass, ShieldAlert } from 'lucide-react';
+import { HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
-export default function BrandHistory() {
+interface BrandHistoryProps {
+  homeContent?: HomeContent;
+}
+
+export default function BrandHistory({ homeContent = DEFAULT_HOME_CONTENT }: BrandHistoryProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -62,11 +68,13 @@ export default function BrandHistory() {
               className="space-y-3"
             >
               <span className="text-[10px] tracking-[0.5em] text-[#efeae0]/80 font-bold uppercase block">
-                ATENCIÓN CONCIERGE
+                {homeContent.conciergeTag || 'ATENCIÓN CONCIERGE'}
               </span>
               <h2 className="font-serif-elegant text-3xl sm:text-4xl text-[#efeae0] leading-tight" style={{ fontWeight: 200 }}>
-                Habita el estilo. <br />
-                <span className="font-sans font-extrabold tracking-tight text-white block mt-1">Conecta con Sunns.</span>
+                {homeContent.conciergeTitle || 'Habita el estilo.'} <br />
+                <span className="font-sans font-extrabold tracking-tight text-white block mt-1">
+                  {homeContent.conciergeSubtitle || 'Conecta con Sunns.'}
+                </span>
               </h2>
               <div className="w-16 h-[1.5px] bg-[#efeae0]/40 mx-auto lg:mx-0 mt-4" />
             </motion.div>
@@ -78,7 +86,7 @@ export default function BrandHistory() {
               transition={{ delay: 0.1, duration: 0.6 }}
               className="text-xs text-[#efeae0]/70 font-light leading-relaxed max-w-md mx-auto lg:mx-0"
             >
-              ¿Tienes dudas sobre nuestra colección de lentes, necesitas asesoría de estilo personalizada o deseas realizar un pedido especial? Nuestro equipo de conserjería premium responderá tu solicitud de inmediato.
+              {homeContent.conciergeDescription || '¿Tienes dudas sobre nuestra colección de lentes, necesitas asesoría de estilo personalizada o deseas realizar un pedido especial? Nuestro equipo de conserjería premium responderá tu solicitud de inmediato.'}
             </motion.p>
 
             {/* Quick Micro-Features */}

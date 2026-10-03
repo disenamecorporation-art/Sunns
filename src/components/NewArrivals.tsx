@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { Eye, ShoppingCart, Heart, Star } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Product, ProductColor } from '../types';
+import { Product, ProductColor, HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
 interface NewArrivalsProps {
   onProductClick: (id: string) => void;
@@ -14,6 +15,7 @@ interface NewArrivalsProps {
   onToggleFavorite: (product: Product) => void;
   favorites: Product[];
   products: Product[];
+  homeContent?: HomeContent;
 }
 
 export default function NewArrivals({
@@ -22,6 +24,7 @@ export default function NewArrivals({
   onToggleFavorite,
   favorites,
   products,
+  homeContent = DEFAULT_HOME_CONTENT,
 }: NewArrivalsProps) {
   // Filter only featured products, or show the first 4 premium ones
   const featuredProducts = products.filter((p) => p.featured).slice(0, 4);
@@ -39,15 +42,15 @@ export default function NewArrivals({
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16">
           <div className="max-w-md">
             <span className="text-[10px] tracking-[0.45em] text-black font-semibold uppercase block mb-3">
-              LANZAMIENTOS RECIENTES
+              {homeContent.arrivalsTag || 'LANZAMIENTOS RECIENTES'}
             </span>
             <h2 className="font-serif-elegant text-3xl sm:text-4xl font-bold text-black leading-tight">
-              New Arrivals
+              {homeContent.arrivalsTitle || 'New Arrivals'}
             </h2>
             <div className="w-12 h-[1.5px] bg-black mt-4" />
           </div>
           <p className="text-xs text-black/60 font-light max-w-sm mt-4 md:mt-0 leading-relaxed">
-            La última expresión de la artesanía Sunns. Perfiles tallados con precisión extrema y acabados con pulido de espejo.
+            {homeContent.arrivalsDescription || 'La última expresión de la artesanía Sunns. Perfiles tallados con precisión extrema y acabados con pulido de espejo.'}
           </p>
         </div>
 

@@ -5,11 +5,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, ArrowRight, Glasses, ShieldCheck, Heart, ShoppingBag, X } from 'lucide-react';
+import { Sparkles, ArrowRight, Glasses, ShieldCheck, Heart, ShoppingBag, X, Tag } from 'lucide-react';
 
-import { Product, CartItem, ProductColor, User, Category } from './types';
+import { Product, CartItem, ProductColor, User, Category, Coupon, HomeContent } from './types';
 import { PRODUCTS } from './data/products';
 import { DEFAULT_CATEGORIES } from './data/categories';
+import { DEFAULT_HOME_CONTENT } from './data/homeContent';
+import { dbGetProducts, dbGetCategories, dbGetActiveSession, dbGetHomeContent, dbLogoutUser } from './lib/dbService';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import FeaturedCategories from './components/FeaturedCategories';
@@ -22,8 +24,11 @@ import ProductDetailView from './components/ProductDetailView';
 import CartDrawer from './components/CartDrawer';
 import FavoritesDrawer from './components/FavoritesDrawer';
 import SearchOverlay from './components/SearchOverlay';
-import AccountModal from './components/AccountModal';
+import AccountView from './components/AccountView';
+import AuthModal from './components/AuthModal';
 import CheckoutModal from './components/CheckoutModal';
+import WelcomePopup from './components/WelcomePopup';
+import AdminView from './components/AdminView';
 
 interface ToastNotification {
   id: string;
@@ -32,54 +37,52 @@ interface ToastNotification {
 }
 
 export default function App() {
-  // Load products state
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('sunns_products');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return PRODUCTS;
-  });
+  // Load products state from DB
+  const [products, setProducts] = useState<Product[]>(PRODUCTS);
 
-  // Save products when changed
+  // Load categories state from DB
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+
+  // Load current user from DB session
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Load home content from Supabase DB
+  const [homeContent, setHomeContent] = useState<HomeContent>(DEFAULT_HOME_CONTENT);
+
+  // Initial load from Database
   useEffect(() => {
-    localStorage.setItem('sunns_products', JSON.stringify(products));
-  }, [products]);
-
-  // Load categories state
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('sunns_categories');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    let isMounted = true;
+    async function loadInitialDBData() {
+      try {
+        const [dbProducts, dbCategories, dbHome] = await Promise.all([
+          dbGetProducts(),
+          dbGetCategories(),
+          dbGetHomeContent(),
+        ]);
+        if (isMounted) {
+          if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+          if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
+          if (dbHome) setHomeContent(dbHome);
+          const activeSession = dbGetActiveSession();
+          if (activeSession) setCurrentUser(activeSession);
+        }
+      } catch (err) {
+        console.warn('DB initialization error:', err);
+      }
     }
-    return DEFAULT_CATEGORIES;
-  });
+    loadInitialDBData();
+    return () => { isMounted = false; };
+  }, []);
 
-  // Save categories when changed
-  useEffect(() => {
-    localStorage.setItem('sunns_categories', JSON.stringify(categories));
-  }, [categories]);
-
-  // Load current user
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sunns_current_user');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return null;
-  });
-
-  // Save current user
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('sunns_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('sunns_current_user');
-    }
-  }, [currentUser]);
+  // Coupon & Welcome Popup States
+  const [isWelcomePopupOpen, setIsWelcomePopupOpen] = useState(true);
+  const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [authInitialEmail, setAuthInitialEmail] = useState<string>('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Navigation / Router State
-  const [currentView, setView] = useState<string>('home'); // home | shop | product-detail
+  const [currentView, setView] = useState<string>('home'); // home | shop | product-detail | account
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [initialCategory, setInitialCategory] = useState<string>('');
 
@@ -91,7 +94,6 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   // Custom Toast State
@@ -123,26 +125,27 @@ export default function App() {
       );
 
       if (existingIdx > -1) {
-        // Increment quantity
         const updated = [...prevCart];
         updated[existingIdx].quantity += quantity;
         return updated;
       } else {
-        // Add new item
         return [...prevCart, { product, selectedColor: color, quantity }];
       }
     });
 
-    showToast(`"${product.name}" (${color.name}) añadido a tu bolsa.`, 'success');
-    
-    // Automatically open the cart drawer for seamless feedback
-    setTimeout(() => {
-      setIsCartOpen(true);
-    }, 300);
+    showToast(`✓ "${product.name}" (${color.name}) añadido al carrito`);
+  };
+
+  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1) => {
+    handleAddToCart(product, color, quantity);
+    setIsCartOpen(true);
   };
 
   const handleUpdateCartQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) return;
+    if (quantity <= 0) {
+      handleRemoveCartItem(index);
+      return;
+    }
     setCart((prev) => {
       const updated = [...prev];
       updated[index].quantity = quantity;
@@ -151,151 +154,150 @@ export default function App() {
   };
 
   const handleRemoveCartItem = (index: number) => {
-    const item = cart[index];
-    setCart((prev) => prev.filter((_, idx) => idx !== index));
-    showToast(`"${item.product.name}" eliminado de tu bolsa.`, 'info');
+    setCart((prev) => prev.filter((_, i) => i !== index));
+    showToast('Producto eliminado del carrito', 'info');
   };
 
   // Favorites actions
   const handleToggleFavorite = (product: Product) => {
-    const exists = favorites.some((f) => f.id === product.id);
-    if (exists) {
-      setFavorites((prev) => prev.filter((f) => f.id !== product.id));
-      showToast(`"${product.name}" eliminado de favoritos.`, 'info');
-    } else {
-      setFavorites((prev) => [...prev, product]);
-      showToast(`"${product.name}" guardado en favoritos.`, 'fav');
-    }
-  };
-
-  // Buy Now action
-  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1) => {
-    // Ensure item is in cart
-    setCart((prevCart) => {
-      const existingIdx = prevCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor.name === color.name
-      );
-      if (existingIdx > -1) {
-        const updated = [...prevCart];
-        updated[existingIdx].quantity = quantity;
-        return updated;
+    setFavorites((prev) => {
+      const isFav = prev.some((p) => p.id === product.id);
+      if (isFav) {
+        showToast(`Removido de favoritos: ${product.name}`, 'info');
+        return prev.filter((p) => p.id !== product.id);
       } else {
-        return [...prevCart, { product, selectedColor: color, quantity }];
+        showToast(`❤️ Guardado en favoritos: ${product.name}`, 'fav');
+        return [...prev, product];
       }
     });
-
-    // Close any drawers and open checkout immediately
-    setIsCartOpen(false);
-    setIsFavoritesOpen(false);
-    setIsCheckoutOpen(true);
   };
 
-  // Checkout complete callback
-  const handleCheckoutSuccess = () => {
-    setCart([]); // Clear cart
-    setView('home'); // Go back home
-    showToast('¡Pago procesado con éxito! Tu orden Sunns está en camino.', 'success');
-  };
-
-  // Navigate & open product detail
+  // Navigation handlers
   const handleProductClick = (productId: string) => {
     setSelectedProductId(productId);
     setView('product-detail');
   };
 
-  // Scrolling helpers
   const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      const offset = 90; // header height buffer
-      const bodyRect = document.body.getBoundingClientRect().top;
-      const elementRect = element.getBoundingClientRect().top;
-      const elementPosition = elementRect - bodyRect;
-      const offsetPosition = elementPosition - offset;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth',
-      });
+    if (currentView !== 'home') {
+      setView('home');
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
-  // Total items inside the cart
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+  const handleCheckoutSuccess = () => {
+    setCart([]);
+    showToast('🎉 ¡Pedido procesado con éxito!', 'success');
+  };
+
+  const handleLogout = () => {
+    dbLogoutUser();
+    setCurrentUser(null);
+    setView('home');
+    showToast('Sesión cerrada correctamente', 'info');
+  };
 
   return (
-    <div className="relative min-h-screen bg-[#faf9f6] text-[#1a120e] flex flex-col justify-between overflow-x-hidden selection:bg-[#1a120e]/10 selection:text-[#1a120e]">
+    <div className="min-h-screen bg-[#faf9f6] text-[#1a120e] selection:bg-[#1a120e] selection:text-[#f5f0e6] relative">
       
-      {/* 1. STICKY HEADER */}
+      {/* 1. STICKY GLOBAL HEADER */}
       <Header
         currentView={currentView}
         setView={setView}
-        cartCount={cartCount}
+        cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
         favoritesCount={favorites.length}
+        currentUser={currentUser}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenFavorites={() => setIsFavoritesOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenAccount={() => setIsAccountOpen(true)}
+        onOpenAccount={() => {
+          if (currentUser) {
+            setView('account');
+          } else {
+            setAuthInitialMode('login');
+            setAuthInitialEmail('');
+            setIsAuthModalOpen(true);
+          }
+        }}
+        onOpenAdminPanel={() => setView('admin')}
         scrollToSection={scrollToSection}
       />
 
-      {/* 2. DYNAMIC MAIN PORT / VIEWS */}
-      <div className="flex-grow">
+      {/* 2. DYNAMIC MAIN BODY ROUTER */}
+      <div className="relative">
         <AnimatePresence mode="wait">
           {currentView === 'home' && (
-            <motion.div
-              key="home-view"
+            <motion.main
+              key="home"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.3 }}
             >
-              {/* Home Screen Sections */}
-              <Hero setView={setView} />
+              <Hero setView={setView} homeContent={homeContent} />
+              
+              <FeaturedCategories
+                setView={setView}
+                setSelectedCategory={setInitialCategory}
+                homeContent={homeContent}
+              />
+
               <NewArrivals
-                onProductClick={handleProductClick}
+                products={products}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
                 favorites={favorites}
-                products={products}
+                onProductClick={handleProductClick}
+                homeContent={homeContent}
               />
-              <BrandHistory />
-              <FeaturedCategories setView={setView} setSelectedCategory={setInitialCategory} />
-              <Testimonials />
-            </motion.div>
+
+              <BrandHistory homeContent={homeContent} />
+
+              <Testimonials homeContent={homeContent} />
+            </motion.main>
           )}
 
           {currentView === 'shop' && (
             <motion.div
-              key="shop-view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              key="shop"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
             >
               <ShopView
+                products={products}
+                categories={categories}
                 initialCategory={initialCategory}
-                onProductClick={handleProductClick}
+                onClearInitialCategory={() => setInitialCategory('')}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
                 favorites={favorites}
-                onClearInitialCategory={() => setInitialCategory('')}
-                products={products}
-                categories={categories}
+                onProductClick={handleProductClick}
               />
             </motion.div>
           )}
 
-          {currentView === 'product-detail' && selectedProductId && (
+          {currentView === 'product-detail' && (
             <motion.div
-              key="detail-view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              key="product-detail"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
             >
               <ProductDetailView
-                productId={selectedProductId}
+                productId={selectedProductId || products[0]?.id || '1'}
                 onBack={() => setView('shop')}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
@@ -303,6 +305,61 @@ export default function App() {
                 favorites={favorites}
                 onProductClick={handleProductClick}
                 products={products}
+              />
+            </motion.div>
+          )}
+
+          {currentView === 'account' && (
+            <motion.div
+              key="account"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AccountView
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+                products={products}
+                setProducts={setProducts}
+                categories={categories}
+                setCategories={setCategories}
+                onNavigateHome={() => setView('home')}
+                onNavigateShop={() => setView('shop')}
+                onOpenAdminPanel={() => setView('admin')}
+                onOpenAuthModal={() => {
+                  setAuthInitialMode('login');
+                  setIsAuthModalOpen(true);
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* VIEW 5: SUPER ADMIN HUB (FULL PAGE DASHBOARD) */}
+          {currentView === 'admin' && (
+            <motion.div
+              key="admin"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <AdminView
+                currentUser={currentUser}
+                products={products}
+                setProducts={setProducts}
+                categories={categories}
+                setCategories={setCategories}
+                homeContent={homeContent}
+                setHomeContent={setHomeContent}
+                onNavigateHome={() => setView('home')}
+                onNavigateShop={() => setView('shop')}
+                onNavigateAccount={() => setView('account')}
+                onLogout={handleLogout}
+                onOpenAuthModal={() => {
+                  setAuthInitialMode('login');
+                  setIsAuthModalOpen(true);
+                }}
               />
             </motion.div>
           )}
@@ -314,6 +371,7 @@ export default function App() {
         setView={setView}
         setSelectedCategory={setInitialCategory}
         scrollToSection={scrollToSection}
+        homeContent={homeContent}
       />
 
       {/* 4. CART DRAWER COMPONENT */}
@@ -323,7 +381,19 @@ export default function App() {
         cart={cart}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
+        activeCoupon={activeCoupon}
+        onOpenCouponModal={() => {
+          setIsCartOpen(false);
+          setIsWelcomePopupOpen(true);
+        }}
         onCheckout={() => {
+          if (!currentUser) {
+            setIsCartOpen(false);
+            setAuthInitialMode('login');
+            setIsAuthModalOpen(true);
+            showToast('Por favor, inicie sesión o regístrese para continuar con el pago.', 'info');
+            return;
+          }
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
@@ -347,16 +417,18 @@ export default function App() {
         products={products}
       />
 
-      {/* 7. CLUB VIP ACCOUNT MODAL */}
-      <AccountModal
-        isOpen={isAccountOpen}
-        onClose={() => setIsAccountOpen(false)}
-        currentUser={currentUser}
-        setCurrentUser={setCurrentUser}
-        products={products}
-        setProducts={setProducts}
-        categories={categories}
-        setCategories={setCategories}
+      {/* 7. SUPER GLASS POP-UP MODAL (LOGIN & REGISTRO) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setView('account');
+          showToast(`✨ ¡Bienvenido de nuevo, ${user.name}!`, 'success');
+        }}
+        initialMode={authInitialMode}
+        initialEmail={authInitialEmail}
+        activeCoupon={activeCoupon}
       />
 
       {/* 8. SECURE CHECKOUT FLOW & RECEIPT GENERATOR */}
@@ -364,10 +436,29 @@ export default function App() {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         cart={cart}
+        currentUser={currentUser}
+        activeCoupon={activeCoupon}
         onSuccess={handleCheckoutSuccess}
       />
 
-      {/* 9. CUSTOM TOAST NOTIFICATION STACK */}
+      {/* 10. HERO-STYLED WELCOME COUPON POPUP */}
+      <WelcomePopup
+        isOpen={isWelcomePopupOpen}
+        onClose={() => setIsWelcomePopupOpen(false)}
+        onApplyCoupon={(coupon) => {
+          setActiveCoupon(coupon);
+          showToast(`🎉 ¡Cupón "${coupon.code}" (${coupon.discountPercent}% OFF) activado!`, 'success');
+        }}
+        onRedirectRegister={(email) => {
+          setAuthInitialEmail(email);
+          setAuthInitialMode('register');
+          setIsAuthModalOpen(true);
+        }}
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+      />
+
+      {/* 11. CUSTOM TOAST NOTIFICATION STACK */}
       <div className="fixed top-24 right-4 z-50 space-y-3 pointer-events-none max-w-sm w-full px-4 sm:px-0">
         <AnimatePresence>
           {toasts.map((toast) => (

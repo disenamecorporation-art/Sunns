@@ -6,13 +6,20 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { HomeContent } from '../types';
+import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 
 interface FeaturedCategoriesProps {
   setView: (view: string) => void;
   setSelectedCategory: (category: string) => void;
+  homeContent?: HomeContent;
 }
 
-export default function FeaturedCategories({ setView, setSelectedCategory }: FeaturedCategoriesProps) {
+export default function FeaturedCategories({ 
+  setView, 
+  setSelectedCategory,
+  homeContent = DEFAULT_HOME_CONTENT 
+}: FeaturedCategoriesProps) {
   const categories = [
     {
       id: 'Sol',
@@ -54,10 +61,10 @@ export default function FeaturedCategories({ setView, setSelectedCategory }: Fea
         {/* Section Header */}
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="text-[10px] tracking-[0.45em] text-black font-semibold uppercase block mb-3">
-            COLECCIONES EXCLUSIVAS
+            {homeContent.categoriesTag || 'COLECCIONES EXCLUSIVAS'}
           </span>
           <h2 className="font-serif-elegant text-3xl sm:text-4xl font-bold text-black leading-tight">
-            Diseño adaptado a cada perspectiva
+            {homeContent.categoriesTitle || 'Diseño adaptado a cada perspectiva'}
           </h2>
           <div className="w-12 h-[1.5px] bg-black mx-auto mt-5" />
         </div>

@@ -4,9 +4,9 @@
  */
 
 import React from 'react';
-import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, ShieldCheck, Truck, Tag, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CartItem } from '../types';
+import { CartItem, Coupon } from '../types';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -15,6 +15,8 @@ interface CartDrawerProps {
   onUpdateQuantity: (index: number, quantity: number) => void;
   onRemoveItem: (index: number) => void;
   onCheckout: () => void;
+  activeCoupon?: Coupon | null;
+  onOpenCouponModal?: () => void;
 }
 
 export default function CartDrawer({
@@ -24,12 +26,15 @@ export default function CartDrawer({
   onUpdateQuantity,
   onRemoveItem,
   onCheckout,
+  activeCoupon,
+  onOpenCouponModal,
 }: CartDrawerProps) {
   // Calculate pricing sums
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const shipping = 0; // Free express shipping
-  const estimatedTax = subtotal * 0.10; // 10% VAT/IVA included or extra (let's display included to match premium boutiques)
-  const total = subtotal;
+  const discountAmount = activeCoupon ? (subtotal * activeCoupon.discountPercent) / 100 : 0;
+  const total = Math.max(0, subtotal - discountAmount);
+  const estimatedTax = total * 0.10; // 10% VAT/IVA included in price
 
   return (
     <AnimatePresence>
@@ -98,93 +103,116 @@ export default function CartDrawer({
                   </button>
                 </div>
               ) : (
-                cart.map((item, index) => {
-                  return (
-                    <motion.div
-                      key={`${item.product.id}-${item.selectedColor.name}`}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex gap-4 p-4 bg-[#faf9f6] border border-[#efeae0] rounded-xl hover:border-[#1a120e]/15 transition-all duration-300 relative"
-                      id={`cart-item-${index}`}
-                    >
-                      {/* Product Visual */}
-                      <div className="w-20 h-20 bg-white rounded-lg border border-[#efeae0]/50 flex items-center justify-center p-3 shrink-0">
-                        <img
-                          src={item.product.image}
-                          alt={item.product.name}
-                          referrerPolicy="no-referrer"
-                          className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.04)]"
-                        />
-                      </div>
-
-                      {/* Product Details */}
-                      <div className="flex-1 flex flex-col justify-between">
+                <div className="space-y-4">
+                  {/* Active Coupon notification bar if present */}
+                  {activeCoupon ? (
+                    <div className="bg-gradient-to-r from-[#1a120e] to-[#2c1d15] text-[#f5f0e6] p-3 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-300" />
                         <div>
-                          <div className="flex items-start justify-between">
-                            <h4 className="text-xs font-bold text-[#1a120e] uppercase tracking-wide max-w-[180px]">
-                              {item.product.name}
-                            </h4>
-                            <span className="text-xs font-bold text-[#1a120e]">
+                          <span className="text-[10px] uppercase font-bold text-amber-300 block">
+                            Cupón {activeCoupon.code} Aplicado
+                          </span>
+                          <span className="text-[9px] text-[#efeae0]/70">
+                            10% de descuento en el total
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-amber-300">
+                        -{activeCoupon.discountPercent}%
+                      </span>
+                    </div>
+                  ) : onOpenCouponModal ? (
+                    <button
+                      onClick={onOpenCouponModal}
+                      className="w-full bg-[#faf9f6] hover:bg-[#f2ece1] border border-dashed border-[#1a120e]/30 p-2.5 rounded-xl flex items-center justify-between text-xs text-[#1a120e] transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium">
+                        <Tag className="w-3.5 h-3.5 text-amber-600" />
+                        ¿Tienes un cupón de 10% OFF?
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 underline">
+                        Activar aquí
+                      </span>
+                    </button>
+                  ) : null}
+
+                  <div className="divide-y divide-[#efeae0]">
+                    {cart.map((item, index) => (
+                      <div key={`${item.product.id}-${item.selectedColor.name}-${index}`} className="py-4 flex gap-4">
+                        {/* Product Thumbnail */}
+                        <div className="w-20 h-20 bg-[#faf9f6] border border-[#efeae0] rounded-lg p-2 flex items-center justify-center shrink-0">
+                          <img
+                            src={item.product.image}
+                            alt={item.product.name}
+                            className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+
+                        {/* Item Details */}
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-start">
+                              <h3 className="font-serif-elegant font-bold text-xs text-black">
+                                {item.product.name}
+                              </h3>
+                              <button
+                                onClick={() => onRemoveItem(index)}
+                                className="text-black/40 hover:text-red-600 p-1 transition-colors cursor-pointer"
+                                aria-label="Eliminar producto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full border border-black/10"
+                                style={{ backgroundColor: item.selectedColor.value }}
+                              />
+                              <span className="text-[10px] text-black/60 font-light">
+                                {item.selectedColor.name}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center mt-2">
+                            {/* Quantity Controls */}
+                            <div className="flex items-center border border-[#efeae0] rounded bg-[#faf9f6]">
+                              <button
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                                className="p-1 text-black/60 hover:text-black transition-colors cursor-pointer disabled:opacity-30"
+                                disabled={item.quantity <= 1}
+                                aria-label="Disminuir cantidad"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-xs font-semibold px-2 text-black">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                                className="p-1 text-black/60 hover:text-black transition-colors cursor-pointer"
+                                aria-label="Aumentar cantidad"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <span className="font-bold text-xs text-black">
                               ${(item.product.price * item.quantity).toFixed(2)} USD
                             </span>
                           </div>
-                          
-                          {/* Variant & Unit Price */}
-                          <div className="flex items-center gap-1.5 text-[10px] text-[#1a120e]/50 mt-1 font-medium">
-                            <span
-                              className="w-2 h-2 rounded-full border border-black/5"
-                              style={{ backgroundColor: item.selectedColor.value }}
-                            />
-                            <span>{item.selectedColor.name}</span>
-                            <span>•</span>
-                            <span>${item.product.price} USD c/u</span>
-                          </div>
-                        </div>
-
-                        {/* Interactive actions (quantity and delete) */}
-                        <div className="flex items-center justify-between pt-2">
-                          
-                          {/* Quantity control micro-component */}
-                          <div className="flex items-center border border-[#efeae0] rounded-md overflow-hidden bg-white">
-                            <button
-                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
-                              className="p-1.5 hover:bg-[#efeae0] text-[#1a120e] disabled:opacity-30 transition-all focus:outline-none cursor-pointer"
-                              id={`cart-item-dec-${index}`}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="w-7 text-center text-xs font-bold text-[#1a120e]">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                              className="p-1.5 hover:bg-[#efeae0] text-[#1a120e] transition-all focus:outline-none cursor-pointer"
-                              id={`cart-item-inc-${index}`}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </div>
-
-                          {/* Remove button */}
-                          <button
-                            onClick={() => onRemoveItem(index)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            aria-label="Eliminar del carrito"
-                            id={`cart-item-remove-${index}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-
                         </div>
                       </div>
-                    </motion.div>
-                  );
-                })
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Drawer Footer: Pricing details and checkout triggers */}
+            {/* Cart Footer & Checkout Action */}
             {cart.length > 0 && (
               <div className="p-6 border-t border-[#efeae0] bg-[#faf9f6] space-y-4">
                 
@@ -194,20 +222,29 @@ export default function CartDrawer({
                     <span>Subtotal</span>
                     <span>${subtotal.toFixed(2)} USD</span>
                   </div>
+
+                  {activeCoupon && (
+                    <div className="flex justify-between text-green-700 font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Tag className="w-3 h-3" /> Cupón Bienvenida ({activeCoupon.discountPercent}%)
+                      </span>
+                      <span>-${discountAmount.toFixed(2)} USD</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-[#1a120e]/65">
                     <span className="flex items-center gap-1">
-                      Envío Express
+                      Envío Express Asegurado
                       <span className="text-green-700 font-semibold">(Gratis)</span>
                     </span>
                     <span>$0.00 USD</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-[#1a120e]/45 italic">
-                    <span>IVA (10%) Incluido en el precio</span>
-                    <span>-${estimatedTax.toFixed(2)} USD</span>
-                  </div>
+
                   <div className="border-t border-[#efeae0]/60 my-2 pt-2 flex justify-between text-base font-bold text-[#1a120e]">
-                    <span>Total Estimado</span>
-                    <span>${total.toFixed(2)} USD</span>
+                    <span>Total a Pagar</span>
+                    <span className={activeCoupon ? 'text-green-700' : 'text-[#1a120e]'}>
+                      ${total.toFixed(2)} USD
+                    </span>
                   </div>
                 </div>
 
@@ -218,13 +255,13 @@ export default function CartDrawer({
                 </div>
 
                 {/* Pay Trigger Button */}
-                <div className="space-y-2.5 pt-2">
+                <div className="space-y-2.5 pt-1">
                   <button
                     onClick={onCheckout}
                     className="w-full bg-black hover:bg-zinc-800 text-[#f5f0e6] hover:text-white text-xs font-bold tracking-widest uppercase py-4 transition-colors duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-black/10"
                     id="cart-checkout-btn"
                   >
-                    Proceder al Pago
+                    Proceder al Pago Segura (${total.toFixed(2)} USD)
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
@@ -238,7 +275,7 @@ export default function CartDrawer({
 
                 {/* Secure checkout notice */}
                 <p className="text-[9px] text-black/40 text-center flex items-center justify-center gap-1 font-light">
-                  <ShieldCheck className="w-3.5 h-3.5 text-black/60" /> Pago 100% seguro y encriptado bajo certificados SSL.
+                  <ShieldCheck className="w-3.5 h-3.5 text-black/60" /> Pasarela Stripe encriptada bajo estándares PCI-DSS.
                 </p>
 
               </div>

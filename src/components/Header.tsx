@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Heart, User, Search, Menu, X, Glasses } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Menu, X, Glasses, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { User as UserType } from '../types';
 
 interface HeaderProps {
   currentView: string;
@@ -16,6 +17,8 @@ interface HeaderProps {
   onOpenFavorites: () => void;
   onOpenSearch: () => void;
   onOpenAccount: () => void;
+  onOpenAdminPanel?: () => void;
+  currentUser?: UserType | null;
   scrollToSection: (id: string) => void;
 }
 
@@ -28,6 +31,8 @@ export default function Header({
   onOpenFavorites,
   onOpenSearch,
   onOpenAccount,
+  onOpenAdminPanel,
+  currentUser,
   scrollToSection,
 }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -47,7 +52,7 @@ export default function Header({
   }, []);
 
   const isHome = currentView === 'home';
-  const isShop = currentView === 'shop';
+  const isShop = currentView === 'shop' || currentView === 'account' || currentView === 'product-detail' || currentView === 'admin';
 
   // Determine header background & text styles based on view and scroll state
   let headerBgClass = '';
@@ -132,8 +137,22 @@ export default function Header({
             })}
           </nav>
 
-          {/* Utilities (Search, Account, Favorites, Cart) */}
-          <div className="flex items-center space-x-3 sm:space-x-5">
+          {/* Utilities (Search, Admin, Account, Favorites, Cart) */}
+          <div className="flex items-center space-x-2.5 sm:space-x-4">
+            
+            {/* Admin Panel Quick Access Button */}
+            {currentUser?.role === 'admin' && onOpenAdminPanel && (
+              <button
+                onClick={onOpenAdminPanel}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400 text-black font-bold text-[11px] tracking-wider uppercase shadow-[0_0_15px_rgba(245,158,11,0.5)] hover:bg-amber-300 transition-all cursor-pointer animate-pulse"
+                title="Abrir Panel de Administración"
+                id="header-admin-panel-btn"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-black" />
+                <span>Admin Panel</span>
+              </button>
+            )}
+
             {/* Search */}
             <button
               onClick={onOpenSearch}
@@ -240,6 +259,20 @@ export default function Header({
             }`}
           >
             <div className="px-6 py-8 flex flex-col space-y-5">
+              {currentUser?.role === 'admin' && onOpenAdminPanel && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenAdminPanel();
+                  }}
+                  className="flex items-center gap-2 bg-amber-400 text-black font-bold text-xs uppercase tracking-widest px-4 py-3 rounded-xl shadow-lg cursor-pointer"
+                  id="mobile-admin-panel-btn"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Panel de Administración</span>
+                </button>
+              )}
+
               {navItems.map((item) => (
                 <button
                   key={item.label}
