@@ -54,8 +54,27 @@ async function startServer() {
 
       if (!response.ok) {
         console.error('Square API Error:', data);
-        const errorMessage = data.errors?.[0]?.detail || 'Error processing payment with Square';
-        return res.status(400).json({ success: false, error: errorMessage, details: data.errors });
+        const firstError = data.errors?.[0];
+        let errorMessage = firstError?.detail || 'Error al procesar el pago con Square';
+        
+        // Translate common decline reasons
+        if (firstError?.code === 'INSUFFICIENT_FUNDS') {
+          errorMessage = 'Pago rechazado: Fondos insuficientes en la tarjeta.';
+        } else if (firstError?.code === 'CARD_DECLINED') {
+          errorMessage = 'Pago rechazado: La entidad bancaria ha declinado la transacción.';
+        } else if (firstError?.code === 'CVV_FAILURE') {
+          errorMessage = 'Pago rechazado: El código CVC de seguridad es incorrecto.';
+        } else if (firstError?.code === 'CARD_EXPIRED') {
+          errorMessage = 'Pago rechazado: La tarjeta ingresada ha expirado.';
+        } else if (firstError?.code === 'GENERIC_DECLINE') {
+          errorMessage = 'Pago rechazado: Transacción denegada por su banco emisor.';
+        } else if (firstError?.code === 'CARD_DECLINED_CALL_ISSUER') {
+          errorMessage = 'Pago rechazado: Comuníquese con su banco emisor para autorizar el cobro.';
+        } else if (firstError?.code === 'ADDRESS_VERIFICATION_FAILURE') {
+          errorMessage = 'Pago rechazado: La dirección o código postal no coincide con el registro del banco.';
+        }
+
+        return res.status(400).json({ success: false, error: errorMessage, code: firstError?.code, details: data.errors });
       }
 
       console.log('Square payment successful:', data.payment?.id);

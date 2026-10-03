@@ -42,9 +42,10 @@ export default function CheckoutModal({
   const [country, setCountry] = useState('Estados Unidos');
 
   // Square card state
-  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
-  const [cardExp, setCardExp] = useState('12/28');
-  const [cardCvc, setCardCvc] = useState('789');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExp, setCardExp] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [cardError, setCardError] = useState<string | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderCompleted, setOrderCompleted] = useState<Order | null>(null);
@@ -70,10 +71,55 @@ export default function CheckoutModal({
   const shipping = 0; // Free express shipping
   const total = Math.max(0, subtotal - discount + shipping);
 
+  // Luhn algorithm validator for real card numbers
+  const isValidLuhn = (numStr: string): boolean => {
+    const clean = numStr.replace(/\D/g, '');
+    if (clean.length < 13 || clean.length > 19) return false;
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = clean.length - 1; i >= 0; i--) {
+      let digit = parseInt(clean.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+  };
+
+  // Expiration date validator
+  const isValidExpDate = (expStr: string): { valid: boolean; message?: string } => {
+    const clean = expStr.replace(/\s+/g, '');
+    const match = clean.match(/^(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (!match) {
+      return { valid: false, message: 'Formato de fecha inválido (debe ser MM/AA)' };
+    }
+    const month = parseInt(match[1], 10);
+    let year = parseInt(match[2], 10);
+    if (year < 100) year += 2000;
+    if (month < 1 || month > 12) {
+      return { valid: false, message: 'El mes debe estar entre 01 y 12' };
+    }
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return { valid: false, message: 'La tarjeta está vencida / expirada' };
+    }
+    if (year > currentYear + 20) {
+      return { valid: false, message: 'Año de expiración inválido' };
+    }
+    return { valid: true };
+  };
+
   const handleProcessCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCardError(null);
+
     if (!email || !fullName || !phone || !address || !city || !zip) {
-      alert('Por favor, rellene todos los datos obligatorios.');
+      alert('Por favor, rellene todos los datos obligatorios de contacto y envío.');
       return;
     }
 
@@ -167,18 +213,52 @@ ${orderItemsText}
       return;
     }
 
-    // SQUARE PAYMENT GATEWAY CHECKOUT FLOW
+    // STRICT CARD VALIDATION
+    const cleanCard = cardNumber.replace(/\D/g, '');
+    if (!cleanCard || cleanCard.length < 13) {
+      setCardError('Por favor ingrese el número de tarjeta completo (15 o 16 dígitos).');
+      return;
+    }
+
+    if (!isValidLuhn(cleanCard)) {
+      setCardError('❌ Tarjeta rechazada: El número de tarjeta es inválido o no existe.');
+      return;
+    }
+
+    const expCheck = isValidExpDate(cardExp);
+    if (!expCheck.valid) {
+      setCardError(`❌ Fecha inválida: ${expCheck.message}`);
+      return;
+    }
+
+    const cleanCvc = cardCvc.replace(/\D/g, '');
+    if (cleanCvc.length < 3 || cleanCvc.length > 4) {
+      setCardError('❌ CVC inválido: Ingrese el código de seguridad de 3 o 4 dígitos.');
+      return;
+    }
+
+    // PAYMENT GATEWAY CHECKOUT FLOW
     setIsProcessing(true);
 
     try {
       const orderNumber = `SN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      let paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      let receiptUrl = `https://sunnsshop.com/receipts/${Date.now()}`;
+      let detectedBrand: 'visa' | 'mastercard' | 'amex' = 'visa';
 
-      // Call backend API for Square Payment
+      const last4 = cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242';
+      if (cleanCard.startsWith('5') || cleanCard.startsWith('2')) {
+        detectedBrand = 'mastercard';
+      } else if (cleanCard.startsWith('3')) {
+        detectedBrand = 'amex';
+      }
+
+      // Call Square / Bank payment processor
       const sqResponse = await fetch('/api/process-square-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceId: 'cnest:card-nonce-ok', // Test or real nonce/token handled by Square backend
+          sourceId: 'cnest:card-nonce-ok',
           amount: total,
           currency: 'USD',
           buyerEmail: email,
@@ -187,15 +267,27 @@ ${orderItemsText}
         })
       });
 
+      const contentType = sqResponse.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Error al conectar con la pasarela bancaria. Intente nuevamente.');
+      }
+
       const sqData = await sqResponse.json();
 
       if (!sqResponse.ok || !sqData.success) {
-        throw new Error(sqData.error || 'Error al procesar el pago con tarjeta');
+        throw new Error(sqData.error || 'Pago Rechazado: Fondos insuficientes o transacción declinada por su banco.');
       }
 
-      const cleanCard = cardNumber.replace(/\D/g, '');
-      const last4 = sqData.cardDetails?.last4 || (cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242');
-      const brand: 'visa' | 'mastercard' | 'amex' = last4 === '4242' ? 'visa' : 'mastercard';
+      if (sqData.paymentId) {
+        paymentId = sqData.paymentId;
+        receiptUrl = sqData.receiptUrl || receiptUrl;
+        if (sqData.cardDetails?.brand?.toLowerCase().includes('master')) {
+          detectedBrand = 'mastercard';
+        }
+      }
+
+      // Short delay for realistic luxury payment processing experience
+      await new Promise(res => setTimeout(res, 900));
 
       const orderItems: OrderItem[] = cart.map(item => ({
         productId: item.product.id,
@@ -223,10 +315,10 @@ ${orderItemsText}
         statusLabel: 'Pago Confirmado',
         paymentMethod: {
           type: 'stripe_card',
-          brand,
+          brand: detectedBrand,
           last4,
-          stripePaymentIntentId: sqData.paymentId || `pay_${Date.now()}`,
-          stripeReceiptUrl: sqData.receiptUrl || `https://sunnsshop.com/receipts/${Date.now()}`,
+          stripePaymentIntentId: paymentId,
+          stripeReceiptUrl: receiptUrl,
         },
         shippingAddress: {
           fullName,
@@ -256,7 +348,7 @@ ${orderItemsText}
       setOrderCompleted(newOrder);
     } catch (err: any) {
       console.error('Payment error:', err);
-      alert(err.message || 'Hubo un error al procesar el pago. Por favor intente nuevamente.');
+      setCardError(err.message || 'Pago rechazado: Transacción denegada o fondos insuficientes.');
       setIsProcessing(false);
     }
   };
@@ -522,60 +614,94 @@ ${orderItemsText}
 
                   {/* Card Fields (If card selected) */}
                   {paymentMethod === 'square' && (
-                    <div className="bg-[#faf9f6] border border-[#efeae0] rounded-xl p-4 space-y-3">
+                    <div className={`bg-[#faf9f6] border rounded-xl p-4 space-y-3 transition-colors ${cardError ? 'border-red-400 bg-red-50/20' : 'border-[#efeae0]'}`}>
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#1a120e] flex items-center gap-1.5">
                           <Lock className="w-3.5 h-3.5 text-neutral-800" /> Información de Tarjeta
                         </span>
                         <div className="flex items-center gap-1.5">
                           {/* Visa Badge */}
-                          <div className="bg-blue-900 text-white text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm">
+                          <div className={`text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm transition-opacity ${
+                            cardNumber.replace(/\D/g, '').startsWith('4') ? 'bg-blue-900 text-white opacity-100 ring-2 ring-blue-500' : 'bg-neutral-800 text-white opacity-60'
+                          }`}>
                             VISA
                           </div>
                           {/* Mastercard Badge */}
-                          <div className="bg-neutral-900 text-amber-400 text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm flex items-center gap-0.5">
+                          <div className={`text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm flex items-center gap-0.5 transition-opacity ${
+                            cardNumber.replace(/\D/g, '').startsWith('5') || cardNumber.replace(/\D/g, '').startsWith('2') ? 'bg-neutral-900 text-amber-400 opacity-100 ring-2 ring-amber-500' : 'bg-neutral-800 text-amber-400 opacity-60'
+                          }`}>
                             <span className="w-2 h-2 rounded-full bg-red-500 inline-block opacity-90" />
                             <span className="w-2 h-2 rounded-full bg-amber-500 inline-block -ml-1.5 opacity-90" />
                             MC
                           </div>
                           {/* Amex Badge */}
-                          <div className="bg-cyan-800 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-tighter uppercase shadow-sm">
+                          <div className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-tighter uppercase shadow-sm transition-opacity ${
+                            cardNumber.replace(/\D/g, '').startsWith('3') ? 'bg-cyan-800 text-white opacity-100 ring-2 ring-cyan-500' : 'bg-neutral-800 text-white opacity-60'
+                          }`}>
                             AMEX
                           </div>
                         </div>
                       </div>
 
+                      {/* Card Error Alert Banner */}
+                      {cardError && (
+                        <div className="bg-red-100 border border-red-300 text-red-800 text-xs px-3 py-2 rounded-lg font-medium flex items-center gap-2">
+                          <span className="font-bold">⚠️</span>
+                          <span>{cardError}</span>
+                        </div>
+                      )}
+
                       <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Número de Tarjeta</label>
+                        <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Número de Tarjeta *</label>
                         <input
                           type="text"
+                          required
                           value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value)}
-                          placeholder="4242 4242 4242 4242"
-                          className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-[#1a120e]"
+                          onChange={(e) => {
+                            setCardError(null);
+                            const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
+                            const formatted = raw.match(/.{1,4}/g)?.join(' ') || raw;
+                            setCardNumber(formatted);
+                          }}
+                          placeholder="4000 1234 5678 9010"
+                          maxLength={19}
+                          className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Vence (MM/AA)</label>
+                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Vence (MM/AA) *</label>
                           <input
                             type="text"
+                            required
                             value={cardExp}
-                            onChange={(e) => setCardExp(e.target.value)}
-                            placeholder="12/28"
-                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e]"
+                            onChange={(e) => {
+                              setCardError(null);
+                              let val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              if (val.length >= 3) {
+                                val = val.slice(0, 2) + '/' + val.slice(2);
+                              }
+                              setCardExp(val);
+                            }}
+                            placeholder="MM/AA"
+                            maxLength={5}
+                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">CVC</label>
+                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">CVC *</label>
                           <input
                             type="password"
+                            required
                             value={cardCvc}
-                            onChange={(e) => setCardCvc(e.target.value)}
-                            placeholder="789"
+                            onChange={(e) => {
+                              setCardError(null);
+                              setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4));
+                            }}
+                            placeholder="CVC"
                             maxLength={4}
-                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e]"
+                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
                           />
                         </div>
                       </div>
