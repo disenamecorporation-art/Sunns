@@ -15,23 +15,6 @@ import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 // ==========================================
 let memUsers: (User & { password?: string })[] = [
   {
-    id: 'usr_admin_sunns_owner',
-    email: 'sunnsshop@icloud.com',
-    password: 'admin123',
-    name: 'Sunns Administrator',
-    phone: '+1 (786) 825-9355',
-    role: 'admin',
-    tier: 'Super Admin',
-    memberSince: '2026',
-    totalSpent: 0,
-    loyaltyPoints: 50000,
-    stripeCustomerId: 'cus_sunns_owner',
-    twoFactorEnabled: true,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    addresses: [],
-    paymentMethods: [],
-  },
-  {
     id: 'usr_admin_001',
     email: 'admin@sunnsshop.com',
     password: 'admin123',
@@ -457,12 +440,28 @@ export async function dbRegisterUser(userData: {
 }): Promise<{ success: boolean; user?: User; error?: string }> {
   const emailNorm = userData.email.trim().toLowerCase();
   
-  // Check if exists in memory
-  const existing = memUsers.find(u => u.email.toLowerCase() === emailNorm);
-  if (existing) {
-    return { success: false, error: 'Este correo electrónico ya se encuentra registrado.' };
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('email', emailNorm)
+        .maybeSingle();
+
+      if (existingUser) {
+        return { success: false, error: 'Este correo electrónico ya se encuentra registrado.' };
+      }
+    } catch (err) {
+      console.warn('DB existence check warning:', err);
+    }
+  } else {
+    const existing = memUsers.find(u => u.email.toLowerCase() === emailNorm);
+    if (existing) {
+      return { success: false, error: 'Este correo electrónico ya se encuentra registrado.' };
+    }
   }
 
+  const isAdminEmail = emailNorm === 'sunnsshop@icloud.com' || emailNorm === 'admin@sunnsshop.com';
   const newUserId = `usr_${Date.now()}`;
   const newUser: User & { password?: string } = {
     id: newUserId,
@@ -470,11 +469,11 @@ export async function dbRegisterUser(userData: {
     password: userData.password || 'sunns_guest_pass',
     name: userData.name.trim(),
     phone: userData.phone || '',
-    role: 'user',
-    tier: 'Club Privé Member',
+    role: isAdminEmail ? 'admin' : 'user',
+    tier: isAdminEmail ? 'Super Admin' : 'Club Privé Member',
     memberSince: new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(new Date()),
     totalSpent: 0,
-    loyaltyPoints: 100, // 100 welcome points
+    loyaltyPoints: isAdminEmail ? 50000 : 100, // Welcome points
     addresses: [],
     paymentMethods: [],
     twoFactorEnabled: false,
@@ -486,7 +485,7 @@ export async function dbRegisterUser(userData: {
 
   if (isSupabaseConfigured()) {
     try {
-      // 1. Also register in Supabase Auth (auth.users) so it displays in the "Authentication -> Users" dashboard
+      // 1. Also register in Supabase Auth (auth.users)
       let authUserId: string | null = null;
       try {
         const { data: authData, error: authErr } = await supabase.auth.signUp({
