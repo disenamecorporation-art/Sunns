@@ -439,35 +439,38 @@ export async function dbRegisterUser(userData: {
   phone?: string;
 }): Promise<{ success: boolean; user?: User; error?: string }> {
   const emailNorm = userData.email.trim().toLowerCase();
-  
-  if (isSupabaseConfigured()) {
-    try {
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('email', emailNorm)
-        .maybeSingle();
+  const isAdminEmail = emailNorm === 'sunnsshop@icloud.com' || emailNorm === 'admin@sunnsshop.com';
 
-      if (existingUser) {
-        return { success: false, error: 'Este correo electrónico ya se encuentra registrado.' };
+  // For non-admin accounts, check if already exists
+  if (!isAdminEmail) {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('email', emailNorm)
+          .maybeSingle();
+
+        if (existingUser) {
+          return { success: false, error: 'Este correo electrónico ya se encuentra registrado. Por favor inicia sesión.' };
+        }
+      } catch (err) {
+        console.warn('DB existence check warning:', err);
       }
-    } catch (err) {
-      console.warn('DB existence check warning:', err);
-    }
-  } else {
-    const existing = memUsers.find(u => u.email.toLowerCase() === emailNorm);
-    if (existing) {
-      return { success: false, error: 'Este correo electrónico ya se encuentra registrado.' };
+    } else {
+      const existing = memUsers.find(u => u.email.toLowerCase() === emailNorm);
+      if (existing) {
+        return { success: false, error: 'Este correo electrónico ya se encuentra registrado. Por favor inicia sesión.' };
+      }
     }
   }
 
-  const isAdminEmail = emailNorm === 'sunnsshop@icloud.com' || emailNorm === 'admin@sunnsshop.com';
   const newUserId = `usr_${Date.now()}`;
   const newUser: User & { password?: string } = {
     id: newUserId,
     email: emailNorm,
     password: userData.password || 'sunns_guest_pass',
-    name: userData.name.trim(),
+    name: userData.name.trim() || (isAdminEmail ? 'Sunnsshop Admin' : 'Socio Sunns'),
     phone: userData.phone || '',
     role: isAdminEmail ? 'admin' : 'user',
     tier: isAdminEmail ? 'Super Admin' : 'Club Privé Member',
@@ -479,13 +482,20 @@ export async function dbRegisterUser(userData: {
     twoFactorEnabled: false,
   };
 
-  memUsers.push(newUser);
+  // Update or insert into memory
+  const existingIdx = memUsers.findIndex(u => u.email.toLowerCase() === emailNorm);
+  if (existingIdx >= 0) {
+    memUsers[existingIdx] = { ...memUsers[existingIdx], ...newUser };
+  } else {
+    memUsers.push(newUser);
+  }
+
   memActiveUser = { ...newUser };
   delete (memActiveUser as any).password;
 
   if (isSupabaseConfigured()) {
     try {
-      // 1. Also register in Supabase Auth (auth.users)
+      // 1. Also sync with Supabase Auth (auth.users) if possible
       let authUserId: string | null = null;
       try {
         const { data: authData, error: authErr } = await supabase.auth.signUp({
@@ -506,7 +516,7 @@ export async function dbRegisterUser(userData: {
         console.warn('Supabase Auth signUp sync attempt:', authError);
       }
 
-      // 2. Insert into public.users table (Table Editor -> users)
+      // 2. Insert or Upsert into public.users table (Table Editor -> users)
       const userRecordId = authUserId || newUser.id;
       newUser.id = userRecordId;
       if (memActiveUser) memActiveUser.id = userRecordId;
@@ -523,7 +533,7 @@ export async function dbRegisterUser(userData: {
         total_spent: newUser.totalSpent,
         loyalty_points: newUser.loyaltyPoints,
         two_factor_enabled: newUser.twoFactorEnabled,
-      });
+      }, { onConflict: 'email' });
     } catch (err) {
       console.warn('DB Register user insert error:', err);
     }
@@ -611,7 +621,29 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
   }
 
   // Memory fallback
-  const userMatch = memUsers.find(u => u.email.toLowerCase() === emailNorm);
+  let userMatch = memUsers.find(u => u.email.toLowerCase() === emailNorm);
+  
+  // Auto-initialize admin account if not yet registered in memory
+  if (!userMatch && (emailNorm === 'sunnsshop@icloud.com' || emailNorm === 'admin@sunnsshop.com')) {
+    const adminUser: User & { password?: string } = {
+      id: `usr_admin_${Date.now()}`,
+      email: emailNorm,
+      password: password || 'admin123',
+      name: 'Sunnsshop Admin',
+      phone: '+1 (786) 825-9355',
+      role: 'admin',
+      tier: 'Super Admin',
+      memberSince: '2026',
+      totalSpent: 0,
+      loyaltyPoints: 50000,
+      addresses: [],
+      paymentMethods: [],
+      twoFactorEnabled: false,
+    };
+    memUsers.push(adminUser);
+    userMatch = adminUser;
+  }
+
   if (!userMatch) {
     return { success: false, error: 'No encontramos ninguna cuenta asociada a este correo electrónico.' };
   }
