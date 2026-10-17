@@ -732,7 +732,7 @@ export default function AdminHomeEditor({
                   type="text"
                   value={form.footerCopyright}
                   onChange={(e) => handleChange('footerCopyright', e.target.value)}
-                  placeholder="Sunns Shop © 2026. Todos los derechos reservados..."
+                  placeholder="Hecho por Legaint Corporation"
                   className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
                 />
               </div>

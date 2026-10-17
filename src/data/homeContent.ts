@@ -98,5 +98,5 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
   footerPhone: '+1 (786) 825-9355',
   footerEmail: 'Sunnsshop@icloud.com',
   footerAddress: 'Brickell Avenue, Miami, FL, USA',
-  footerCopyright: 'Sunns Shop © 2026. Todos los derechos reservados. Diseñado bajo estándares de lujo sostenible en Miami.',
+  footerCopyright: 'Hecho por Legaint Corporation',
 };

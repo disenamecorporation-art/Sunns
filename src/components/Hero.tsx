@@ -99,12 +99,13 @@ export default function Hero({ setView, homeContent = DEFAULT_HOME_CONTENT }: He
       />
 
       {/* 2. GIANT EDITORIAL LETTERS "SUNNSHOP" BEHIND THE MODEL */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[2] select-none overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[2] select-none overflow-hidden notranslate" translate="no">
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: 'easeOut' }}
-          className="w-full max-w-[1550px] px-3 sm:px-6 flex items-center justify-between text-center font-hero-editorial leading-none tracking-[-0.03em] sm:tracking-[-0.02em]"
+          className="w-full max-w-[1550px] px-3 sm:px-6 flex items-center justify-between text-center font-hero-editorial leading-none tracking-[-0.03em] sm:tracking-[-0.02em] notranslate"
+          translate="no"
           style={{
             fontSize: 'clamp(2rem, 11.8vw, 15.5rem)',
           }}

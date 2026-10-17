@@ -242,7 +242,7 @@ export default function Footer({
         {/* Bottom copyright and legal notes */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-[#f5f0e6]/45 font-light">
           <div>
-            {homeContent.footerCopyright || 'Sunns Shop © 2026. Todos los derechos reservados. Diseñado bajo estándares de lujo sostenible en Miami.'}
+            Hecho por Legaint Corporation
           </div>
           <div className="flex space-x-6">
             <a href="#" className="hover:text-white transition-colors">

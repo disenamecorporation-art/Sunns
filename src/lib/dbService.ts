@@ -1228,6 +1228,7 @@ export async function dbGetCoupon(code: string): Promise<CouponRecord | null> {
 let memHomeContent: HomeContent = { ...DEFAULT_HOME_CONTENT };
 
 export async function dbGetHomeContent(): Promise<HomeContent> {
+  let content = { ...DEFAULT_HOME_CONTENT };
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
@@ -1237,21 +1238,25 @@ export async function dbGetHomeContent(): Promise<HomeContent> {
         .single();
 
       if (!error && data && data.content) {
-        memHomeContent = {
+        content = {
           ...DEFAULT_HOME_CONTENT,
           ...(typeof data.content === 'string' ? JSON.parse(data.content) : data.content)
         };
-        return memHomeContent;
       }
     } catch (err) {
       console.warn('DB Get home content error, falling back to memory/default:', err);
     }
+  } else {
+    content = { ...memHomeContent };
   }
 
-  return { ...memHomeContent };
+  content.footerCopyright = 'Hecho por Legaint Corporation';
+  memHomeContent = content;
+  return content;
 }
 
 export async function dbSaveHomeContent(content: HomeContent): Promise<boolean> {
+  content.footerCopyright = 'Hecho por Legaint Corporation';
   memHomeContent = { ...content };
 
   if (isSupabaseConfigured()) {
