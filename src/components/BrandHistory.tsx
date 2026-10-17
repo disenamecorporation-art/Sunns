@@ -25,16 +25,28 @@ export default function BrandHistory({ homeContent = DEFAULT_HOME_CONTENT }: Bra
     if (!name || !email || !message) return;
 
     setIsLoading(true);
-    
-    // Simulate premium submission with nice timing
+
+    const whatsappMessage = `🌟 *NUEVA CONSULTA CONCIERGE - SUNNSHOP* 🌟
+
+👤 *Nombre:* ${name}
+📧 *Correo:* ${email}
+
+💬 *Mensaje / Consulta:*
+${message}
+
+¡Hola! He enviado este mensaje desde el formulario de contacto web de SUNNSHOP y deseo recibir asistencia personalizada.`;
+
+    const encoded = encodeURIComponent(whatsappMessage);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=17868259355&text=${encoded}`;
+
     setTimeout(() => {
       setIsLoading(false);
       setIsSubmitted(true);
-      // Reset form fields
+      window.open(whatsappUrl, '_blank');
       setName('');
       setEmail('');
       setMessage('');
-    }, 1200);
+    }, 800);
   };
 
   return (

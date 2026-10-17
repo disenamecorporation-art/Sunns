@@ -28,6 +28,16 @@ export default function Footer({
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
+      const whatsappMessage = `🌟 *SUSCRIPCIÓN NEWSLETTER - SUNNSHOP* 🌟
+
+📧 *Correo Electrónico:* ${email}
+
+¡Hola! Me he registrado en el formulario de entrada/newsletter de la web y quiero reclamar mi 10% de descuento de cortesía en mi primera compra.`;
+
+      const encoded = encodeURIComponent(whatsappMessage);
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=17868259355&text=${encoded}`;
+
+      window.open(whatsappUrl, '_blank');
       setSubscribed(true);
       setEmail('');
       setTimeout(() => setSubscribed(false), 5000);
