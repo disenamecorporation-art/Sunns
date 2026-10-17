@@ -73,6 +73,9 @@ export default function AdminView({
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
+  // Tutorial state for product uploading
+  const [showProductTutorial, setShowProductTutorial] = useState(false);
+
   // Categories State
   const [newCatName, setNewCatName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -754,6 +757,81 @@ export default function AdminView({
                     <span>Nuevo Producto</span>
                   </button>
                 </div>
+
+                {/* Tutorial Banner & Step-by-Step Guide */}
+                <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 text-white rounded-2xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">Guía Paso a Paso: Cómo Subir un Producto e Imagen</h4>
+                      <p className="text-[11px] text-neutral-300 mt-0.5">Aprende a añadir tus lentes al catálogo y obtener el enlace directo de imagen en Postimages.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowProductTutorial(!showProductTutorial)}
+                    className="px-4 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-xs font-semibold tracking-wider uppercase transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {showProductTutorial ? 'Ocultar Tutorial' : 'Ver Tutorial Detallado'}
+                  </button>
+                </div>
+
+                {/* Collapsible Tutorial Content */}
+                {showProductTutorial && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-neutral-50 border-2 border-neutral-200 rounded-2xl p-6 space-y-4 text-xs text-neutral-800 shadow-inner"
+                  >
+                    <h5 className="font-bold text-sm text-black flex items-center gap-2 border-b border-neutral-200 pb-2">
+                      <span>📸</span> Tutorial Completo: Subir Productos y Enlaces de Imágenes
+                    </h5>
+
+                    <div className="space-y-3 leading-relaxed">
+                      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm space-y-2">
+                        <strong className="text-black font-bold block text-sm flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-mono">1</span>
+                          Obtener el Enlace Directo (URL) de la Imagen en Postimages
+                        </strong>
+                        <p className="text-neutral-600">
+                          Para que la foto de tus lentes se vea perfectamente en la tienda web, necesitas un enlace directo de imagen. Sigue estos pasos exactos:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1.5 pl-1 text-neutral-700 font-medium">
+                          <li>
+                            Haz clic en el siguiente enlace para abrir la plataforma oficial en una pestaña nueva:{' '}
+                            <a
+                              href="https://postimages.org/es/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 font-bold inline-flex items-center gap-1"
+                            >
+                              https://postimages.org/es/ <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </li>
+                          <li>Una vez en la página de Postimages, haz clic en el botón verde <strong>"Elige tus imágenes"</strong> o arrastra la foto de tus lentes desde tu computadora.</li>
+                          <li>Espera unos segundos a que cargue. Verás varios enlaces generados para compartir.</li>
+                          <li>Busca el campo etiquetado como <strong>"Enlace directo"</strong> (Direct link) y haz clic en el botón de <strong>Copiar</strong> al lado. El enlace copiado debe terminar en formato de imagen (como <code className="bg-neutral-100 px-1 py-0.5 rounded font-mono text-neutral-900">.jpg</code>, <code className="bg-neutral-100 px-1 py-0.5 rounded font-mono text-neutral-900">.png</code> o <code className="bg-neutral-100 px-1 py-0.5 rounded font-mono text-neutral-900">.webp</code>).</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm space-y-2">
+                        <strong className="text-black font-bold block text-sm flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-mono">2</span>
+                          Publicar el Producto en este Panel de Administración
+                        </strong>
+                        <ol className="list-decimal list-inside space-y-1.5 pl-1 text-neutral-700 font-medium">
+                          <li>Haz clic en el botón superior derecho <strong>"Nuevo Producto"</strong> en este panel.</li>
+                          <li>En el formulario que aparecerá abajo, pega el enlace que acabas de copiar de Postimages en el campo <strong>"URL de la Imagen Principal"</strong>.</li>
+                          <li>Escribe el <strong>Nombre del Modelo</strong> (ej: <em>Aviator Gold Elite 2026</em>), el <strong>Precio</strong> en USD y selecciona la <strong>Categoría</strong> (Sol, Óptica, etc.).</li>
+                          <li>Redacta una descripción elegante sobre los materiales y la artesanía del lente.</li>
+                          <li>Haz clic en el botón <strong>"Guardar Producto"</strong>. El sistema lo sincronizará instantáneamente con Supabase y aparecerá publicado en la tienda web para todos los clientes de inmediato.</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
