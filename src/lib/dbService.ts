@@ -229,34 +229,32 @@ export interface AdminOrderEntry {
 
 export async function dbGetProducts(): Promise<Product[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*');
 
-    if (error) {
-      console.error('Supabase get products error:', error);
-      throw new Error(error.message || 'Error al obtener los productos desde Supabase');
-    }
-
-    if (Array.isArray(data)) {
-      memProducts = data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        price: Number(row.price),
-        category: row.category,
-        subcategory: row.subcategory || undefined,
-        description: row.description || '',
-        details: Array.isArray(row.details) ? row.details : (row.details ? JSON.parse(row.details) : []),
-        image: row.image,
-        images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : [row.image]),
-        colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
-        inStock: Boolean(row.in_stock ?? row.inStock ?? true),
-        featured: Boolean(row.featured ?? false),
-        rating: Number(row.rating || 5.0),
-        reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
-      }));
-      return memProducts;
+      if (!error && Array.isArray(data)) {
+        memProducts = data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          price: Number(row.price),
+          category: row.category,
+          subcategory: row.subcategory || undefined,
+          description: row.description || '',
+          details: Array.isArray(row.details) ? row.details : (row.details ? JSON.parse(row.details) : []),
+          image: row.image,
+          images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : [row.image]),
+          colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
+          inStock: Boolean(row.in_stock ?? row.inStock ?? true),
+          featured: Boolean(row.featured ?? false),
+          rating: Number(row.rating || 5.0),
+          reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
+        }));
+        return memProducts;
+      }
+    } catch (err) {
+      console.warn('Supabase get products warning:', err);
     }
   }
   return [...memProducts];
@@ -656,16 +654,34 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
   }
 
   const { password: _, ...cleanUser } = userMatch;
+  if (emailNorm === 'sunnsshop@icloud.com' || emailNorm === 'admin@sunnsshop.com') {
+    cleanUser.role = 'admin';
+    cleanUser.tier = 'Super Admin';
+  }
   memActiveUser = cleanUser as User;
-  return { success: true, user: cleanUser as User };
+  try {
+    localStorage.setItem('sunns_active_user', JSON.stringify(memActiveUser));
+  } catch (e) {}
+  return { success: true, user: memActiveUser };
 }
 
 export function dbGetActiveSession(): User | null {
+  if (!memActiveUser) {
+    try {
+      const saved = localStorage.getItem('sunns_active_user');
+      if (saved) {
+        memActiveUser = JSON.parse(saved);
+      }
+    } catch (e) {}
+  }
   return memActiveUser;
 }
 
 export function dbLogoutUser(): void {
   memActiveUser = null;
+  try {
+    localStorage.removeItem('sunns_active_user');
+  } catch (e) {}
 }
 
 export async function dbUpdateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {

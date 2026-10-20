@@ -99,9 +99,26 @@ export default function App() {
   // Custom Toast State
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
-  // Scroll restoration on view switch
+  // Refresh products, categories and session on view switch
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as any });
+    async function refreshData() {
+      try {
+        const [dbProducts, dbCategories] = await Promise.all([
+          dbGetProducts(),
+          dbGetCategories(),
+        ]);
+        if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+        if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
+        const sessionUser = dbGetActiveSession();
+        if (sessionUser && (!currentUser || currentUser.id !== sessionUser.id)) {
+          setCurrentUser(sessionUser);
+        }
+      } catch (err) {
+        console.warn('View switch refresh warning:', err);
+      }
+    }
+    refreshData();
   }, [currentView]);
 
   // Toast helper
