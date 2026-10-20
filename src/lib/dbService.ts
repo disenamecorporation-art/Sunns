@@ -229,39 +229,64 @@ export interface AdminOrderEntry {
 
 export async function dbGetProducts(): Promise<Product[]> {
   if (isSupabaseConfigured()) {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data)) {
-        memProducts = data.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          price: Number(row.price),
-          category: row.category,
-          subcategory: row.subcategory || undefined,
-          description: row.description || '',
-          details: Array.isArray(row.details) ? row.details : (row.details ? JSON.parse(row.details) : []),
-          image: row.image,
-          images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : [row.image]),
-          colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
-          inStock: Boolean(row.in_stock ?? row.inStock ?? true),
-          featured: Boolean(row.featured ?? false),
-          rating: Number(row.rating || 5.0),
-          reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
-        }));
-        return memProducts;
-      }
-    } catch (err) {
-      console.warn('DB Products fetch fallback to memory:', err);
+    if (error) {
+      console.error('Supabase get products error:', error);
+      throw new Error(error.message || 'Error al obtener los productos desde Supabase');
+    }
+
+    if (Array.isArray(data)) {
+      memProducts = data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        price: Number(row.price),
+        category: row.category,
+        subcategory: row.subcategory || undefined,
+        description: row.description || '',
+        details: Array.isArray(row.details) ? row.details : (row.details ? JSON.parse(row.details) : []),
+        image: row.image,
+        images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : [row.image]),
+        colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
+        inStock: Boolean(row.in_stock ?? row.inStock ?? true),
+        featured: Boolean(row.featured ?? false),
+        rating: Number(row.rating || 5.0),
+        reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
+      }));
+      return memProducts;
     }
   }
   return [...memProducts];
 }
 
 export async function dbSaveProduct(product: Product): Promise<Product> {
+  if (isSupabaseConfigured()) {
+    const row = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      subcategory: product.subcategory || null,
+      description: product.description,
+      details: product.details,
+      image: product.image,
+      images: product.images,
+      colors: product.colors,
+      in_stock: product.inStock,
+      featured: product.featured,
+      rating: product.rating,
+      reviews_count: product.reviewsCount,
+    };
+    const { error } = await supabase.from('products').upsert(row);
+    if (error) {
+      console.error('Supabase save product error:', error);
+      throw new Error(error.message || 'Error al guardar el producto en Supabase');
+    }
+  }
+
   const existingIndex = memProducts.findIndex(p => p.id === product.id);
   if (existingIndex >= 0) {
     memProducts[existingIndex] = { ...product };
@@ -269,49 +294,19 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
     memProducts.unshift({ ...product });
   }
 
-  if (isSupabaseConfigured()) {
-    try {
-      const row = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        category: product.category,
-        subcategory: product.subcategory || null,
-        description: product.description,
-        details: product.details,
-        image: product.image,
-        images: product.images,
-        colors: product.colors,
-        in_stock: product.inStock,
-        featured: product.featured,
-        rating: product.rating,
-        reviews_count: product.reviewsCount,
-      };
-      await supabase.from('products').upsert(row);
-    } catch (err) {
-      console.warn('DB Save product error:', err);
-    }
-  }
-
   return product;
 }
 
 export async function dbDeleteProduct(productId: string): Promise<boolean> {
-  memProducts = memProducts.filter(p => p.id !== productId);
-
   if (isSupabaseConfigured()) {
-    try {
-      const { error } = await supabase.from('products').delete().eq('id', productId);
-      if (error) {
-        console.error('Supabase delete product error:', error);
-        return false;
-      }
-    } catch (err) {
-      console.warn('DB Delete product error:', err);
-      return false;
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) {
+      console.error('Supabase delete product error:', error);
+      throw new Error(error.message || 'Error al eliminar el producto de Supabase');
     }
   }
 
+  memProducts = memProducts.filter(p => p.id !== productId);
   return true;
 }
 
@@ -321,30 +316,55 @@ export async function dbDeleteProduct(productId: string): Promise<boolean> {
 
 export async function dbGetCategories(): Promise<Category[]> {
   if (isSupabaseConfigured()) {
-    try {
-      const { data: catRows, error: catErr } = await supabase
-        .from('categories')
-        .select('*, subcategories(*)');
+    const { data: catRows, error: catErr } = await supabase
+      .from('categories')
+      .select('*, subcategories(*)');
 
-      if (!catErr && catRows && catRows.length > 0) {
-        memCategories = catRows.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          subcategories: (c.subcategories || []).map((s: any) => ({
-            id: s.id,
-            name: s.name,
-          }))
-        }));
-        return memCategories;
-      }
-    } catch (err) {
-      console.warn('DB Categories fetch fallback to memory:', err);
+    if (catErr) {
+      console.error('Supabase get categories error:', catErr);
+      throw new Error(catErr.message || 'Error al obtener las categorías desde Supabase');
+    }
+
+    if (catRows) {
+      memCategories = catRows.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        subcategories: (c.subcategories || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+        }))
+      }));
+      return memCategories;
     }
   }
   return [...memCategories];
 }
 
 export async function dbSaveCategory(category: Category): Promise<Category> {
+  if (isSupabaseConfigured()) {
+    const { error: catErr } = await supabase.from('categories').upsert({
+      id: category.id,
+      name: category.name,
+    });
+    if (catErr) {
+      console.error('Supabase save category error:', catErr);
+      throw new Error(catErr.message || 'Error al guardar la categoría en Supabase');
+    }
+
+    if (category.subcategories && category.subcategories.length > 0) {
+      const subRows = category.subcategories.map(s => ({
+        id: s.id,
+        category_id: category.id,
+        name: s.name,
+      }));
+      const { error: subErr } = await supabase.from('subcategories').upsert(subRows);
+      if (subErr) {
+        console.error('Supabase save subcategories error:', subErr);
+        throw new Error(subErr.message || 'Error al guardar las subcategorías en Supabase');
+      }
+    }
+  }
+
   const idx = memCategories.findIndex(c => c.id === category.id);
   if (idx >= 0) {
     memCategories[idx] = { ...category };
@@ -352,41 +372,24 @@ export async function dbSaveCategory(category: Category): Promise<Category> {
     memCategories.push({ ...category });
   }
 
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase.from('categories').upsert({
-        id: category.id,
-        name: category.name,
-      });
-
-      if (category.subcategories && category.subcategories.length > 0) {
-        const subRows = category.subcategories.map(s => ({
-          id: s.id,
-          category_id: category.id,
-          name: s.name,
-        }));
-        await supabase.from('subcategories').upsert(subRows);
-      }
-    } catch (err) {
-      console.warn('DB Save category error:', err);
-    }
-  }
-
   return category;
 }
 
 export async function dbDeleteCategory(categoryId: string): Promise<boolean> {
-  memCategories = memCategories.filter(c => c.id !== categoryId);
-
   if (isSupabaseConfigured()) {
-    try {
-      await supabase.from('subcategories').delete().eq('category_id', categoryId);
-      await supabase.from('categories').delete().eq('id', categoryId);
-    } catch (err) {
-      console.warn('DB Delete category error:', err);
+    const { error: subErr } = await supabase.from('subcategories').delete().eq('category_id', categoryId);
+    if (subErr) {
+      console.error('Supabase delete subcategories error:', subErr);
+    }
+
+    const { error: catErr } = await supabase.from('categories').delete().eq('id', categoryId);
+    if (catErr) {
+      console.error('Supabase delete category error:', catErr);
+      throw new Error(catErr.message || 'Error al eliminar la categoría de Supabase');
     }
   }
 
+  memCategories = memCategories.filter(c => c.id !== categoryId);
   return true;
 }
 
