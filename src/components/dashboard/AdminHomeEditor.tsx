@@ -51,10 +51,10 @@ export default function AdminHomeEditor({
       if (success) {
         onUpdateContent(form);
         setSaveSuccess(true);
-        showToast('¡Textos de la página de inicio guardados en Supabase con éxito!');
+        showToast('¡Textos de la página de inicio guardados con éxito!');
         setTimeout(() => setSaveSuccess(false), 3500);
       } else {
-        showToast('Error al conectar con Supabase. Cambios guardados en memoria.');
+        showToast('Error al conectar. Cambios guardados temporalmente.');
       }
     } catch (err) {
       console.error('Error saving home content:', err);
@@ -75,7 +75,7 @@ export default function AdminHomeEditor({
               Editor Editorial de la Portada (Home)
             </h3>
             <span className="font-mono text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full uppercase">
-              Supabase Cloud
+              En Línea
             </span>
           </div>
           <p className="text-xs text-zinc-400 font-light mt-1">
@@ -762,7 +762,7 @@ export default function AdminHomeEditor({
                   transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
                   className="w-4 h-4 border-2 border-black border-t-transparent rounded-full"
                 />
-                <span>Guardando en Supabase...</span>
+                <span>Guardando cambios...</span>
               </>
             ) : (
               <>

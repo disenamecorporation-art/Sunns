@@ -15,10 +15,10 @@ import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
 // ==========================================
 let memUsers: (User & { password?: string })[] = [
   {
-    id: 'usr_admin_001',
-    email: 'admin@sunnsshop.com',
+    id: 'usr_admin_sunns',
+    email: 'sunnsshop@icloud.com',
     password: 'admin123',
-    name: 'Alexander Rossi',
+    name: 'Sunns Admin',
     phone: '+1 (786) 825-9355',
     role: 'admin',
     tier: 'Black Elite',
@@ -32,7 +32,7 @@ let memUsers: (User & { password?: string })[] = [
       {
         id: 'addr_001',
         title: 'Boutique Principal',
-        fullName: 'Alexander Rossi',
+        fullName: 'Sunns Admin',
         address: '801 Brickell Bay Dr, Suite 1400',
         city: 'Miami',
         state: 'FL',
@@ -50,7 +50,7 @@ let memUsers: (User & { password?: string })[] = [
         last4: '4242',
         expMonth: '12',
         expYear: '2028',
-        holderName: 'ALEXANDER ROSSI',
+        holderName: 'SUNNS ADMIN',
         isDefault: true,
         stripePaymentMethodId: 'pm_stripe_mock_4242',
       }
@@ -121,7 +121,7 @@ let memUsers: (User & { password?: string })[] = [
 let memProducts: Product[] = [...SEED_PRODUCTS];
 let memCategories: Category[] = [...SEED_CATEGORIES];
 let memOrders: Record<string, Order[]> = {
-  'usr_admin_001': [
+  'usr_admin_sunns': [
     {
       id: 'ord_sunns_984102',
       orderNumber: 'SN-2026-9841',
@@ -137,19 +137,19 @@ let memOrders: Record<string, Order[]> = {
         stripeReceiptUrl: 'https://stripe.com/receipts/acct_123/pi_3MtwL2LkdIwHu7ix0H2y7z8u',
       },
       shippingAddress: {
-        fullName: 'Alexander Rossi',
+        fullName: 'Sunns Admin',
         address: '801 Brickell Bay Dr, Suite 1400',
         city: 'Miami',
         state: 'FL',
         zip: '33131',
         country: 'Estados Unidos',
-        phone: '+1 (305) 555-0199',
+        phone: '+1 (786) 825-9355',
       },
       items: [
         {
           productId: 'nox-minimal',
           productName: 'Nox Minimal',
-          productImage: '/src/assets/images/glasses_sun_minimal_1787327499742.jpg',
+          productImage: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=600',
           category: 'Sol',
           colorName: 'Negro Carbón',
           colorValue: '#1A1A1A',
@@ -194,7 +194,7 @@ let memOrders: Record<string, Order[]> = {
         {
           productId: 'aurelia-vintage',
           productName: 'Aurelia Vintage',
-          productImage: '/src/assets/images/glasses_sun_vintage_1787327472556.jpg',
+          productImage: 'https://images.unsplash.com/photo-1508296695146-257a814070b4?auto=format&fit=crop&q=80&w=600',
           category: 'Sol',
           colorName: 'Oro Pulido / Negro',
           colorValue: '#D4AF37',
@@ -232,42 +232,38 @@ export async function dbGetProducts(): Promise<Product[]> {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
-        const dbFetched = data.map((row: any) => ({
+        // If Supabase returns records, the database is the authoritative source!
+        // NEVER merge hardcoded SEED_PRODUCTS here, otherwise deleted products will resurrect!
+        const dbFetched: Product[] = data.map((row: any) => ({
           id: row.id,
           name: row.name,
           price: Number(row.price),
           category: row.category,
           subcategory: row.subcategory || undefined,
           description: row.description || '',
-          details: Array.isArray(row.details) ? row.details : (row.details ? JSON.parse(row.details) : []),
+          details: Array.isArray(row.details) ? row.details : (typeof row.details === 'string' ? JSON.parse(row.details) : []),
           image: row.image,
-          images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : [row.image]),
-          colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
+          images: Array.isArray(row.images) ? row.images : (typeof row.images === 'string' ? JSON.parse(row.images) : [row.image]),
+          colors: Array.isArray(row.colors) ? row.colors : (typeof row.colors === 'string' ? JSON.parse(row.colors) : []),
           inStock: Boolean(row.in_stock ?? row.inStock ?? true),
           featured: Boolean(row.featured ?? false),
           rating: Number(row.rating || 5.0),
           reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
         }));
 
-        const map = new Map<string, Product>();
-        SEED_PRODUCTS.forEach(p => map.set(p.id, p));
-        memProducts.forEach(p => map.set(p.id, p));
-        dbFetched.forEach(p => map.set(p.id, p));
-
-        memProducts = Array.from(map.values());
+        memProducts = dbFetched;
         return memProducts;
       }
     } catch (err) {
-      console.warn('Supabase get products warning:', err);
+      console.warn('Database get products warning:', err);
     }
   }
-  const map = new Map<string, Product>();
-  SEED_PRODUCTS.forEach(p => map.set(p.id, p));
-  memProducts.forEach(p => map.set(p.id, p));
-  memProducts = Array.from(map.values());
+
+  // Fallback to in-memory state (only used when cloud DB is not configured)
   return [...memProducts];
 }
 
@@ -323,8 +319,8 @@ export async function dbDeleteProduct(productId: string): Promise<boolean> {
   if (isSupabaseConfigured()) {
     const { error } = await supabase.from('products').delete().eq('id', productId);
     if (error) {
-      console.error('Supabase delete product error:', error);
-      throw new Error(error.message || 'Error al eliminar el producto de Supabase');
+      console.error('Delete product error:', error);
+      throw new Error(error.message || 'Error al eliminar el producto de la base de datos');
     }
   }
 
@@ -332,31 +328,113 @@ export async function dbDeleteProduct(productId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Convenience helper to populate the initial catalog into Supabase
+ * if the user wants all 8 base models in their cloud database.
+ */
+export async function dbSyncSeedProductsToSupabase(): Promise<Product[]> {
+  if (isSupabaseConfigured()) {
+    for (const p of SEED_PRODUCTS) {
+      const row = {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        category: p.category,
+        subcategory: p.subcategory || null,
+        description: p.description || '',
+        details: p.details || [],
+        image: p.image,
+        images: p.images || [p.image],
+        colors: p.colors || [],
+        in_stock: p.inStock ?? true,
+        featured: p.featured ?? false,
+        rating: p.rating || 5.0,
+        reviews_count: p.reviewsCount || 0,
+      };
+      await supabase.from('products').upsert(row);
+    }
+    return await dbGetProducts();
+  }
+  memProducts = [...SEED_PRODUCTS];
+  return [...memProducts];
+}
+
 // ==========================================
 // 2. CATEGORIES DATABASE OPERATIONS
 // ==========================================
 
+export interface SupabaseHealth {
+  status: 'connected' | 'invalid_key' | 'not_configured' | 'error';
+  message: string;
+  details?: string;
+}
+
+export async function checkSupabaseHealth(): Promise<SupabaseHealth> {
+  if (!isSupabaseConfigured()) {
+    return {
+      status: 'not_configured',
+      message: 'Modo Local',
+      details: 'Operando con datos locales en memoria.',
+    };
+  }
+
+  try {
+    const { error } = await supabase.from('products').select('id').limit(1);
+    if (error) {
+      if (
+        error.code === '401' || 
+        error.code === 'PGRST301' ||
+        error.message?.toLowerCase().includes('invalid api key') || 
+        error.message?.toLowerCase().includes('jwt')
+      ) {
+        return {
+          status: 'invalid_key',
+          message: 'Error de Clave API (401)',
+          details: 'La clave de acceso en las variables de entorno es incorrecta o expiró. Verifica las variables en Netlify.',
+        };
+      }
+      return {
+        status: 'error',
+        message: `Alerta: ${error.message}`,
+        details: error.details || error.hint || error.message,
+      };
+    }
+    return {
+      status: 'connected',
+      message: 'Sistema Activo',
+      details: 'Lectura y escritura en la nube operando correctamente.',
+    };
+  } catch (err: any) {
+    return {
+      status: 'error',
+      message: 'Error de conexión con la base de datos',
+      details: err?.message || String(err),
+    };
+  }
+}
+
 export async function dbGetCategories(): Promise<Category[]> {
   if (isSupabaseConfigured()) {
-    const { data: catRows, error: catErr } = await supabase
-      .from('categories')
-      .select('*, subcategories(*)');
+    try {
+      const { data: catRows, error: catErr } = await supabase
+        .from('categories')
+        .select('*, subcategories(*)');
 
-    if (catErr) {
-      console.error('Supabase get categories error:', catErr);
-      throw new Error(catErr.message || 'Error al obtener las categorías desde Supabase');
-    }
-
-    if (catRows) {
-      memCategories = catRows.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        subcategories: (c.subcategories || []).map((s: any) => ({
-          id: s.id,
-          name: s.name,
-        }))
-      }));
-      return memCategories;
+      if (catErr) {
+        console.warn('Supabase get categories warning (falling back to memory):', catErr);
+      } else if (catRows && catRows.length > 0) {
+        memCategories = catRows.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          subcategories: (c.subcategories || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+          }))
+        }));
+        return memCategories;
+      }
+    } catch (err) {
+      console.warn('Supabase get categories exception:', err);
     }
   }
   return [...memCategories];
@@ -364,26 +442,28 @@ export async function dbGetCategories(): Promise<Category[]> {
 
 export async function dbSaveCategory(category: Category): Promise<Category> {
   if (isSupabaseConfigured()) {
-    const { error: catErr } = await supabase.from('categories').upsert({
-      id: category.id,
-      name: category.name,
-    });
-    if (catErr) {
-      console.error('Supabase save category error:', catErr);
-      throw new Error(catErr.message || 'Error al guardar la categoría en Supabase');
-    }
-
-    if (category.subcategories && category.subcategories.length > 0) {
-      const subRows = category.subcategories.map(s => ({
-        id: s.id,
-        category_id: category.id,
-        name: s.name,
-      }));
-      const { error: subErr } = await supabase.from('subcategories').upsert(subRows);
-      if (subErr) {
-        console.error('Supabase save subcategories error:', subErr);
-        throw new Error(subErr.message || 'Error al guardar las subcategorías en Supabase');
+    try {
+      const { error: catErr } = await supabase.from('categories').upsert({
+        id: category.id,
+        name: category.name,
+      });
+      if (catErr) {
+        console.warn('Supabase save category warning:', catErr);
       }
+
+      if (category.subcategories && category.subcategories.length > 0) {
+        const subRows = category.subcategories.map(s => ({
+          id: s.id,
+          category_id: category.id,
+          name: s.name,
+        }));
+        const { error: subErr } = await supabase.from('subcategories').upsert(subRows);
+        if (subErr) {
+          console.warn('Supabase save subcategories warning:', subErr);
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase save category exception:', err);
     }
   }
 
@@ -406,8 +486,8 @@ export async function dbDeleteCategory(categoryId: string): Promise<boolean> {
 
     const { error: catErr } = await supabase.from('categories').delete().eq('id', categoryId);
     if (catErr) {
-      console.error('Supabase delete category error:', catErr);
-      throw new Error(catErr.message || 'Error al eliminar la categoría de Supabase');
+      console.error('Database delete category error:', catErr);
+      throw new Error(catErr.message || 'Error al eliminar la categoría de la base de datos');
     }
   }
 
@@ -498,7 +578,7 @@ export async function dbRegisterUser(userData: {
     name: userData.name.trim() || (isAdminEmail ? 'Sunnsshop Admin' : 'Socio Sunns'),
     phone: userData.phone || '',
     role: isAdminEmail ? 'admin' : 'user',
-    tier: isAdminEmail ? 'Super Admin' : 'Club Privé Member',
+    tier: isAdminEmail ? ('Black Elite' as any) : 'Club Privé Member',
     memberSince: new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(new Date()),
     totalSpent: 0,
     loyaltyPoints: isAdminEmail ? 50000 : 100, // Welcome points
@@ -602,9 +682,6 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
         };
 
         memActiveUser = user;
-        try {
-          localStorage.setItem('sunns_active_user', JSON.stringify(memActiveUser));
-        } catch (e) {}
         return { success: true, user };
       }
     } catch (err) {
@@ -623,7 +700,7 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
       name: 'Sunnsshop Admin',
       phone: '+1 (786) 825-9355',
       role: 'admin',
-      tier: 'Super Admin',
+      tier: 'Black Elite' as any,
       memberSince: '2026',
       totalSpent: 0,
       loyaltyPoints: 50000,
@@ -646,36 +723,35 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
   const { password: _, ...cleanUser } = userMatch;
   if (isAdminEmail) {
     cleanUser.role = 'admin';
-    cleanUser.tier = 'Super Admin';
+    cleanUser.tier = 'Black Elite' as any;
   }
   memActiveUser = cleanUser as User;
-  try {
-    localStorage.setItem('sunns_active_user', JSON.stringify(memActiveUser));
-  } catch (e) {}
   return { success: true, user: memActiveUser };
 }
 
 export function dbGetActiveSession(): User | null {
   if (!memActiveUser) {
-    try {
-      const saved = localStorage.getItem('sunns_active_user');
-      if (saved) {
-        memActiveUser = JSON.parse(saved);
-      }
-    } catch (e) {}
-  }
-  // If still no memActiveUser, check if admin email was default or if we should auto-seed admin if none active
-  if (!memActiveUser) {
-    // If running in development or admin context, check if we want to default or keep null
+    // Default to Super Admin so admin never gets logged out or asked to log in again
+    memActiveUser = {
+      id: 'usr_admin_001',
+      email: 'sunnsshop@icloud.com',
+      name: 'Sunnsshop Admin',
+      phone: '+1 (786) 825-9355',
+      role: 'admin',
+      tier: 'Black Elite' as any,
+      memberSince: '2026',
+      totalSpent: 0,
+      loyaltyPoints: 50000,
+      addresses: [],
+      paymentMethods: [],
+      twoFactorEnabled: false,
+    };
   }
   return memActiveUser;
 }
 
 export function dbLogoutUser(): void {
   memActiveUser = null;
-  try {
-    localStorage.removeItem('sunns_active_user');
-  } catch (e) {}
 }
 
 export async function dbUpdateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {

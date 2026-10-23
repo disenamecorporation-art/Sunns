@@ -80,7 +80,7 @@ export default function AccountView({
   ];
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] pt-24 pb-20 px-4 sm:px-6 lg:px-8 text-neutral-900 font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-[#faf9f6] pt-32 sm:pt-36 lg:pt-40 pb-20 px-4 sm:px-6 lg:px-8 text-neutral-900 font-['Montserrat',sans-serif]">
       <div className="max-w-7xl mx-auto">
         
         {/* Navigation Breadcrumb / Header */}

@@ -52,7 +52,10 @@ export default function ShopView({
     }
   }, [initialCategory, onClearInitialCategory]);
 
-  const categoriesList = useMemo(() => categories.map((c) => c.name), [categories]);
+  const categoriesList = useMemo(() => {
+    const names = categories.map((c) => c.name.trim()).filter(Boolean);
+    return Array.from(new Set(names));
+  }, [categories]);
 
   const colorsList = [
     { name: 'Negro', hex: '#1A1A1A' },
@@ -103,7 +106,10 @@ export default function ShopView({
 
       // 2. Categories
       if (selectedCategories.length > 0) {
-        if (!selectedCategories.includes(p.category)) return false;
+        const matchesCategory = selectedCategories.some(
+          (sel) => sel.toLowerCase().trim() === p.category?.toLowerCase().trim()
+        );
+        if (!matchesCategory) return false;
       }
 
       // 3. Price Filter
@@ -204,7 +210,7 @@ export default function ShopView({
                       onChange={() => toggleCategory(cat)}
                       className="rounded border-[#efeae0] text-[#1a120e] focus:ring-[#1a120e] w-4 h-4"
                     />
-                    <span>{cat === 'Sol' ? 'Sol' : cat === 'Ópticos' ? 'Ópticos' : cat === 'Deportivos' ? 'Deportivos' : 'Vintage'}</span>
+                    <span>{cat}</span>
                   </label>
                 ))}
               </div>
@@ -394,6 +400,12 @@ export default function ShopView({
                               src={currentImage}
                               alt={p.name}
                               referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                                  target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                                }
+                              }}
                               className="max-h-[210px] w-auto object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.05)]"
                             />
                           </div>

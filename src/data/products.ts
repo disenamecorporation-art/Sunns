@@ -19,11 +19,11 @@ export const PRODUCTS: Product[] = [
       'Lentes polarizados de nailon de máxima nitidez óptica',
       'Estuche de cuero marrón Sunns y paño de microfibra de alta calidad'
     ],
-    image: '/src/assets/images/glasses_sun_minimal_1787327499742.jpg',
+    image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=600',
     images: [
-      '/src/assets/images/glasses_sun_minimal_1787327499742.jpg',
       'https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=600',
-      'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=600'
+      'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=600',
+      'https://images.unsplash.com/photo-1508296695146-257a814070b4?auto=format&fit=crop&q=80&w=600'
     ],
     colors: [
       { name: 'Negro Carbón', value: '#1A1A1A' },
@@ -48,9 +48,8 @@ export const PRODUCTS: Product[] = [
       'Lentes CR-39 con recubrimiento antirreflejante interno',
       'Estuche rígido de piel Sunns premium incluido'
     ],
-    image: '/src/assets/images/glasses_sun_vintage_1787327472556.jpg',
+    image: 'https://images.unsplash.com/photo-1508296695146-257a814070b4?auto=format&fit=crop&q=80&w=600',
     images: [
-      '/src/assets/images/glasses_sun_vintage_1787327472556.jpg',
       'https://images.unsplash.com/photo-1508296695146-257a814070b4?auto=format&fit=crop&q=80&w=600',
       'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?auto=format&fit=crop&q=80&w=600'
     ],
@@ -71,15 +70,14 @@ export const PRODUCTS: Product[] = [
     category: 'Ópticos',
     description: 'Gafas ópticas circulares elegantes con montura de acetato translúcido en tono champaña cálido. Comodidad excepcional de peso pluma y estilo intelectual contemporáneo.',
     details: [
-      'Diseñado para cristales recetados de alta precisión',
+      'Diseñado para cristales recetados de alta precision',
       'Montura de acetato ultraligero y flexible de primera calidad',
       'Varillas reforzadas con alma de metal grabado para ajuste óptimo',
       'Filtro de luz azul sutil preinstalado para pantallas',
       'Incluye certificado de autenticidad, estuche protector y paño'
     ],
-    image: '/src/assets/images/glasses_optical_classic_1787327485566.jpg',
+    image: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?auto=format&fit=crop&q=80&w=600',
     images: [
-      '/src/assets/images/glasses_optical_classic_1787327485566.jpg',
       'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?auto=format&fit=crop&q=80&w=600',
       'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?auto=format&fit=crop&q=80&w=600'
     ],

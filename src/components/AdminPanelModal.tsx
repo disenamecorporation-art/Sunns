@@ -548,7 +548,7 @@ export default function AdminPanelModal({
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>Textos del Home (Supabase)</span>
+              <span>Textos del Home</span>
               <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-black/40 text-amber-200">
                 EDITOR
               </span>

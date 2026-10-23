@@ -12,6 +12,7 @@ import { PRODUCTS } from './data/products';
 import { DEFAULT_CATEGORIES } from './data/categories';
 import { DEFAULT_HOME_CONTENT } from './data/homeContent';
 import { dbGetProducts, dbGetCategories, dbGetActiveSession, dbGetHomeContent, dbLogoutUser } from './lib/dbService';
+import { isSupabaseConfigured } from './lib/supabase';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import FeaturedCategories from './components/FeaturedCategories';
@@ -37,8 +38,8 @@ interface ToastNotification {
 }
 
 export default function App() {
-  // Load products state from DB
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  // Load products state from DB (starts empty when cloud DB is configured to avoid flashing deleted products)
+  const [products, setProducts] = useState<Product[]>(() => isSupabaseConfigured() ? [] : PRODUCTS);
 
   // Load categories state from DB
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
@@ -46,7 +47,7 @@ export default function App() {
   // Load current user from DB session
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Load home content from Supabase DB
+  // Load home content from DB
   const [homeContent, setHomeContent] = useState<HomeContent>(DEFAULT_HOME_CONTENT);
 
   // Initial load from Database
@@ -60,7 +61,7 @@ export default function App() {
           dbGetHomeContent(),
         ]);
         if (isMounted) {
-          if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+          if (dbProducts) setProducts(dbProducts);
           if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
           if (dbHome) setHomeContent(dbHome);
           const activeSession = dbGetActiveSession();
@@ -108,7 +109,7 @@ export default function App() {
           dbGetProducts(),
           dbGetCategories(),
         ]);
-        if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+        if (dbProducts) setProducts(dbProducts);
         if (dbCategories && dbCategories.length > 0) setCategories(dbCategories);
         const sessionUser = dbGetActiveSession();
         if (sessionUser && (!currentUser || currentUser.id !== sessionUser.id)) {

@@ -8,14 +8,16 @@ import {
   ShieldCheck, Package, ShoppingBag, Layers, Sparkles, Plus, 
   Trash2, Edit3, Check, X, Search, DollarSign, TrendingUp, 
   Truck, ArrowLeft, User as UserIcon, LogOut, CheckCircle2, 
-  AlertCircle, Eye, ExternalLink, Filter, ChevronRight
+  AlertCircle, Eye, ExternalLink, Filter, ChevronRight, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product, Category, HomeContent, User, Order } from '../types';
 import { 
   dbGetOrders, dbUpdateOrderStatus, dbSaveProduct, 
   dbDeleteProduct, dbSaveCategory, dbDeleteCategory, 
-  dbAddSubcategory, dbDeleteSubcategory 
+  dbAddSubcategory, dbDeleteSubcategory,
+  checkSupabaseHealth, SupabaseHealth,
+  dbSyncSeedProductsToSupabase
 } from '../lib/dbService';
 import AdminHomeEditor from './dashboard/AdminHomeEditor';
 
@@ -72,6 +74,7 @@ export default function AdminView({
   // Safe inline delete states (NO window.confirm!)
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [isSyncingInitial, setIsSyncingInitial] = useState(false);
 
   // Tutorial state for product uploading
   const [showProductTutorial, setShowProductTutorial] = useState(false);
@@ -85,6 +88,26 @@ export default function AdminView({
 
   // Toast feedback state
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Supabase live connection health
+  const [supabaseHealth, setSupabaseHealth] = useState<SupabaseHealth | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  const runHealthCheck = async () => {
+    setCheckingHealth(true);
+    try {
+      const res = await checkSupabaseHealth();
+      setSupabaseHealth(res);
+    } catch {
+      setSupabaseHealth({ status: 'error', message: 'Error de conexión con la base de datos' });
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    runHealthCheck();
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -140,7 +163,7 @@ export default function AdminView({
             }
           });
         }
-        showToast(`Estado de pedido actualizado a "${newStatus}" en Supabase`);
+        showToast(`Estado de pedido actualizado a "${newStatus}" exitosamente`);
       } else {
         showToast('Error al actualizar el pedido');
       }
@@ -152,14 +175,14 @@ export default function AdminView({
     }
   };
 
-  // Product Delete Handler - 100% Supabase, zero window.confirm, zero localStorage
+  // Product Delete Handler - deletes from cloud database and local state
   const handleDeleteProduct = async (productId: string, productName: string) => {
     setIsDeletingProduct(true);
     try {
       await dbDeleteProduct(productId);
       setProducts(prev => prev.filter(p => p.id !== productId));
       setConfirmDeleteProductId(null);
-      showToast(`Producto "${productName}" eliminado permanentemente de Supabase`);
+      showToast(`Producto "${productName}" eliminado exitosamente`);
     } catch (err) {
       console.error('Delete error:', err);
       showToast('Error al eliminar producto de la base de datos');
@@ -183,16 +206,30 @@ export default function AdminView({
       const existing = products.some(p => p.id === editingProduct.id);
       if (existing) {
         setProducts(prev => prev.map(p => (p.id === editingProduct.id ? editingProduct : p)));
-        showToast(`Producto "${editingProduct.name}" actualizado en Supabase`);
+        showToast(`Producto "${editingProduct.name}" actualizado exitosamente`);
       } else {
         setProducts(prev => [editingProduct, ...prev]);
-        showToast(`Nuevo producto "${editingProduct.name}" creado en Supabase`);
+        showToast(`Nuevo producto "${editingProduct.name}" guardado exitosamente`);
       }
       setEditingProduct(null);
       setIsCreatingProduct(false);
     } catch (err) {
       console.error(err);
       showToast('Error al guardar producto');
+    }
+  };
+
+  const handleSyncInitialCatalog = async () => {
+    setIsSyncingInitial(true);
+    try {
+      const updated = await dbSyncSeedProductsToSupabase();
+      setProducts(updated);
+      showToast('Catálogo inicial de 8 modelos cargado exitosamente');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al cargar catálogo inicial');
+    } finally {
+      setIsSyncingInitial(false);
     }
   };
 
@@ -213,7 +250,7 @@ export default function AdminView({
     await dbSaveCategory(newCat);
     setCategories([...categories, newCat]);
     setNewCatName('');
-    showToast(`Categoría "${newCat.name}" guardada en Supabase`);
+    showToast(`Categoría "${newCat.name}" guardada exitosamente`);
   };
 
   const handleSaveEditCategory = async (catId: string) => {
@@ -243,14 +280,14 @@ export default function AdminView({
     }
 
     setEditingCategoryId(null);
-    showToast('Categoría actualizada en Supabase');
+    showToast('Categoría actualizada exitosamente');
   };
 
   const handleDeleteCategory = async (catId: string, catName: string) => {
     await dbDeleteCategory(catId);
     setCategories(prev => prev.filter(c => c.id !== catId));
     setConfirmDeleteCatId(null);
-    showToast(`Categoría "${catName}" eliminada de Supabase`);
+    showToast(`Categoría "${catName}" eliminada exitosamente`);
   };
 
   const handleAddSubcategory = async (catId: string) => {
@@ -269,7 +306,7 @@ export default function AdminView({
 
     setCategories(updated);
     setNewSubcatInputs({ ...newSubcatInputs, [catId]: '' });
-    showToast('Subcategoría guardada en Supabase');
+    showToast('Subcategoría guardada exitosamente');
   };
 
   const handleDeleteSubcategory = async (catId: string, subId: string) => {
@@ -281,7 +318,7 @@ export default function AdminView({
       return c;
     });
     setCategories(updated);
-    showToast('Subcategoría eliminada de Supabase');
+    showToast('Subcategoría eliminada exitosamente');
   };
 
   // Filtered Orders
@@ -320,7 +357,7 @@ export default function AdminView({
           </div>
           <h2 className="text-xl font-bold text-neutral-900">Acceso Restringido</h2>
           <p className="text-xs text-neutral-600 leading-relaxed">
-            Esta sección es de uso exclusivo para administradores de SUNNS. Inicia sesión con una cuenta autorizada para gestionar la base de datos Supabase.
+            Esta sección es de uso exclusivo para administradores de SUNNS. Inicia sesión con una cuenta autorizada para gestionar la tienda.
           </p>
           <div className="flex gap-3 pt-2">
             <button
@@ -342,7 +379,7 @@ export default function AdminView({
   }
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] pt-24 pb-20 px-4 sm:px-6 lg:px-8 text-neutral-900 font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-[#faf9f6] pt-32 sm:pt-36 lg:pt-40 pb-24 px-4 sm:px-6 lg:px-8 text-neutral-900 font-['Montserrat',sans-serif]">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -351,7 +388,7 @@ export default function AdminView({
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-24 right-6 z-50 bg-black text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold border border-neutral-700"
+            className="fixed top-28 right-6 z-50 bg-black text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold border border-neutral-700"
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
             <span>{toastMsg}</span>
@@ -361,8 +398,8 @@ export default function AdminView({
 
       <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* 1. Breadcrumb and Navigation Bar (Exact same layout as user dashboard) */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-2 pb-4 border-b border-neutral-200">
+        {/* 1. Breadcrumb and Navigation Bar (Comfortably positioned below header) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-2 mb-4 pb-4 border-b border-neutral-200">
           <div className="flex items-center gap-2">
             <button
               onClick={onNavigateHome}
@@ -426,10 +463,33 @@ export default function AdminView({
                   <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
                     Super Administrador
                   </span>
-                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    Supabase Conectado
-                  </span>
+                  {checkingHealth ? (
+                    <span className="text-[10px] text-neutral-400 flex items-center gap-1">
+                      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                      Verificando...
+                    </span>
+                  ) : supabaseHealth?.status === 'connected' ? (
+                    <span
+                      className="text-[10px] text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Sistema Activo
+                    </span>
+                  ) : supabaseHealth?.status === 'invalid_key' ? (
+                    <button
+                      onClick={runHealthCheck}
+                      title="Reintentar verificación"
+                      className="text-[10px] text-rose-400 flex items-center gap-1.5 hover:text-rose-300 transition-colors cursor-pointer bg-rose-500/20 px-2.5 py-0.5 rounded-full border border-rose-500/30"
+                    >
+                      <AlertCircle className="w-3 h-3" />
+                      Reintentar Conexión
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-amber-400 flex items-center gap-1.5 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      Modo Local
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   {currentUser.name || 'Administrador Central'}
@@ -470,6 +530,36 @@ export default function AdminView({
 
           </div>
         </div>
+
+        {/* Database Diagnostic Warning if Invalid Key */}
+        {supabaseHealth?.status === 'invalid_key' && (
+          <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 sm:p-6 text-rose-950 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0 text-rose-700 mt-0.5">
+                <AlertCircle className="w-5 h-5 stroke-[2]" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-rose-900">
+                  Error de autenticación con la Base de Datos (Error 401)
+                </h4>
+                <p className="text-xs text-rose-700 leading-relaxed max-w-3xl">
+                  {supabaseHealth.details || 'La clave de acceso en Netlify no es válida. Mientras esta clave no sea correcta, los cambios no se sincronizarán en la nube.'}
+                </p>
+                <p className="text-[11px] text-rose-600 font-medium">
+                  Verifica que las variables de entorno en tu panel de Netlify tengan la clave pública correcta.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={runHealthCheck}
+              disabled={checkingHealth}
+              className="px-4 py-2 bg-rose-900 hover:bg-rose-800 text-white rounded-xl text-xs font-semibold shrink-0 transition-colors flex items-center gap-2 cursor-pointer shadow"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${checkingHealth ? 'animate-spin' : ''}`} />
+              <span>Reintentar Diagnóstico</span>
+            </button>
+          </div>
+        )}
 
         {/* 3. Main Dashboard Layout (Left Sidebar + Right Content Area) */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -572,7 +662,7 @@ export default function AdminView({
                       Historial de Compras y Pedidos
                     </h3>
                     <p className="text-xs text-neutral-500 mt-0.5">
-                      Monitorea las órdenes registradas en Supabase, actualiza estados y códigos de rastreo.
+                      Monitorea las órdenes registradas, actualiza estados y códigos de rastreo.
                     </p>
                   </div>
 
@@ -649,7 +739,7 @@ export default function AdminView({
                 {/* Orders List */}
                 {loadingOrders ? (
                   <div className="py-12 text-center text-xs text-neutral-500">
-                    Cargando pedidos de Supabase...
+                    Cargando pedidos...
                   </div>
                 ) : filteredOrders.length === 0 ? (
                   <div className="py-12 text-center text-xs text-neutral-500 border-2 border-dashed border-neutral-200 rounded-2xl">
@@ -728,34 +818,48 @@ export default function AdminView({
                       Gestión de Productos
                     </h3>
                     <p className="text-xs text-neutral-500 mt-0.5">
-                      Añade, edita o elimina productos directamente en la tabla Supabase con sincronización inmediata.
+                      Añade, edita o elimina productos del catálogo con sincronización inmediata.
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setEditingProduct({
-                        id: `prod_${Date.now()}`,
-                        name: '',
-                        price: 150,
-                        category: categories[0]?.name || 'Sol',
-                        description: '',
-                        details: ['Material de alta densidad', 'Protección UV400'],
-                        image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800',
-                        images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800'],
-                        colors: ['Negro Mate', 'Carey'],
-                        inStock: true,
-                        featured: false,
-                        rating: 5.0,
-                        reviewsCount: 1,
-                      });
-                      setIsCreatingProduct(true);
-                    }}
-                    className="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shadow-md self-start sm:self-auto"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Nuevo Producto</span>
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                    {products.length === 0 && (
+                      <button
+                        onClick={handleSyncInitialCatalog}
+                        disabled={isSyncingInitial}
+                        className="inline-flex items-center gap-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border border-neutral-300 disabled:opacity-50"
+                        title="Cargar los 8 modelos base a la base de datos"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncingInitial ? 'animate-spin' : ''}`} />
+                        <span>{isSyncingInitial ? 'Cargando...' : 'Cargar Modelos Base (8 modelos)'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setEditingProduct({
+                          id: `prod_${Date.now()}`,
+                          name: '',
+                          price: 150,
+                          category: categories[0]?.name || 'Sol',
+                          description: '',
+                          details: ['Material de alta densidad', 'Protección UV400'],
+                          image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800',
+                          images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800'],
+                          colors: ['Negro Mate', 'Carey'],
+                          inStock: true,
+                          featured: false,
+                          rating: 5.0,
+                          reviewsCount: 1,
+                        });
+                        setIsCreatingProduct(true);
+                      }}
+                      className="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Nuevo Producto</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Tutorial Banner & Step-by-Step Guide */}
@@ -826,7 +930,7 @@ export default function AdminView({
                           <li>En el formulario que aparecerá abajo, pega el enlace que acabas de copiar de Postimages en el campo <strong>"URL de la Imagen Principal"</strong>.</li>
                           <li>Escribe el <strong>Nombre del Modelo</strong> (ej: <em>Aviator Gold Elite 2026</em>), el <strong>Precio</strong> en USD y selecciona la <strong>Categoría</strong> (Sol, Óptica, etc.).</li>
                           <li>Redacta una descripción elegante sobre los materiales y la artesanía del lente.</li>
-                          <li>Haz clic en el botón <strong>"Guardar Producto"</strong>. El sistema lo sincronizará instantáneamente con Supabase y aparecerá publicado en la tienda web para todos los clientes de inmediato.</li>
+                          <li>Haz clic en el botón <strong>"Guardar Producto"</strong>. El sistema lo guardará instantáneamente y aparecerá publicado en la tienda web para todos los clientes de inmediato.</li>
                         </ol>
                       </div>
                     </div>
@@ -989,7 +1093,7 @@ export default function AdminView({
                         type="submit"
                         className="px-5 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer shadow-md"
                       >
-                        Guardar en Supabase
+                        {isCreatingProduct ? 'Publicar Producto' : 'Guardar Cambios'}
                       </button>
                     </div>
                   </form>
@@ -1007,6 +1111,12 @@ export default function AdminView({
                           src={product.image}
                           alt={product.name}
                           referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                              target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                            }
+                          }}
                           className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-neutral-200 bg-white shrink-0"
                         />
                         <div>
