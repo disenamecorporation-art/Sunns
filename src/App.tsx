@@ -136,10 +136,11 @@ export default function App() {
   };
 
   // Cart actions
-  const handleAddToCart = (product: Product, color: ProductColor, quantity = 1) => {
+  const handleAddToCart = (product: Product, color: ProductColor, quantity = 1, selectedLens?: string) => {
+    const lens = selectedLens || product.lensOptions?.[0] || 'Lente Solar Oscuro';
     setCart((prevCart) => {
       const existingIdx = prevCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor.name === color.name
+        (item) => item.product.id === product.id && item.selectedColor?.name === color?.name && (item.selectedLens || '') === lens
       );
 
       if (existingIdx > -1) {
@@ -147,15 +148,15 @@ export default function App() {
         updated[existingIdx].quantity += quantity;
         return updated;
       } else {
-        return [...prevCart, { product, selectedColor: color, quantity }];
+        return [...prevCart, { product, selectedColor: color, quantity, selectedLens: lens }];
       }
     });
 
-    showToast(`✓ "${product.name}" (${color.name}) añadido al carrito`);
+    showToast(`✓ "${product.name}" (${color?.name || 'Negro'} - ${lens}) añadido a tu bolsa`);
   };
 
-  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1) => {
-    handleAddToCart(product, color, quantity);
+  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1, selectedLens?: string) => {
+    handleAddToCart(product, color, quantity, selectedLens);
     setIsCartOpen(true);
   };
 
@@ -302,6 +303,7 @@ export default function App() {
                 onToggleFavorite={handleToggleFavorite}
                 favorites={favorites}
                 onProductClick={handleProductClick}
+                homeContent={homeContent}
               />
             </motion.div>
           )}

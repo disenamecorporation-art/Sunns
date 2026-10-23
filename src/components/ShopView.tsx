@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, SlidersHorizontal, Heart, ShoppingCart, Star, RotateCcw, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Product, ProductColor, Category } from '../types';
+import { Product, ProductColor, Category, HomeContent } from '../types';
 
 interface ShopViewProps {
   initialCategory: string;
@@ -17,6 +17,7 @@ interface ShopViewProps {
   onClearInitialCategory: () => void;
   products: Product[];
   categories: Category[];
+  homeContent?: HomeContent;
 }
 
 export default function ShopView({
@@ -28,11 +29,13 @@ export default function ShopView({
   onClearInitialCategory,
   products,
   categories,
+  homeContent,
 }: ShopViewProps) {
+  const maxPriceLimit = homeContent?.storeMaxPrice || 1000;
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [maxPrice, setMaxPrice] = useState(250);
+  const [maxPrice, setMaxPrice] = useState(maxPriceLimit);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [sortBy, setSortBy] = useState('popular'); // popular, price-asc, price-desc, rating
@@ -229,16 +232,16 @@ export default function ShopView({
               </div>
               <input
                 type="range"
-                min="100"
-                max="300"
-                step="5"
+                min="20"
+                max={maxPriceLimit}
+                step="10"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
                 className="w-full h-1 bg-[#efeae0] rounded-lg appearance-none cursor-pointer accent-[#1a120e]"
               />
               <div className="flex justify-between text-[10px] text-[#1a120e]/40 font-medium">
-                <span>$100 USD</span>
-                <span>$300 USD</span>
+                <span>$20 USD</span>
+                <span>${maxPriceLimit} USD</span>
               </div>
             </div>
 
@@ -372,18 +375,22 @@ export default function ShopView({
                         onMouseLeave={() => setHoveredProduct(null)}
                       >
                         {/* Image Wrap */}
-                        <div className="relative aspect-square w-full bg-[#faf9f6] flex items-center justify-center p-4 border-b border-[#efeae0] overflow-hidden">
+                        <div className="relative aspect-square w-full bg-[#faf9f6] flex items-center justify-center p-2 sm:p-3 border-b border-[#efeae0] overflow-hidden">
                           {/* Stock out badge */}
-                          {!p.inStock && (
-                            <div className="absolute top-4 left-4 z-10 bg-[#e05050] text-[#f5f0e6] text-[8px] tracking-[0.15em] uppercase font-bold px-2.5 py-1">
+                          {!p.inStock ? (
+                            <div className="absolute top-4 left-4 z-10 bg-[#e05050] text-[#f5f0e6] text-[8px] tracking-[0.15em] uppercase font-bold px-2.5 py-1 rounded">
                               Agotado
                             </div>
-                          )}
+                          ) : p.originalPrice && p.originalPrice > p.price ? (
+                            <div className="absolute top-4 left-4 z-10 bg-amber-400 text-black text-[8px] tracking-wider uppercase font-black px-2.5 py-1 rounded-full border border-amber-300 shadow-sm">
+                              -{Math.round((1 - p.price / p.originalPrice) * 100)}%
+                            </div>
+                          ) : null}
 
                           {/* Favorite Button */}
                           <button
                             onClick={() => onToggleFavorite(p)}
-                            className="absolute top-4 right-4 z-10 bg-white hover:bg-[#faf9f6] text-[#1a120e] hover:text-black p-2 rounded-full border border-[#efeae0] transition-all duration-300 shadow-sm focus:outline-none cursor-pointer"
+                            className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white text-[#1a120e] hover:text-black p-2 rounded-full border border-[#efeae0] transition-all duration-300 shadow-sm focus:outline-none cursor-pointer"
                             aria-label="Agregar a favoritos"
                             id={`shop-fav-btn-${p.id}`}
                           >
@@ -409,7 +416,7 @@ export default function ShopView({
                                   target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
                                 }
                               }}
-                              className="max-h-[210px] w-auto object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.05)]"
+                              className="max-h-[250px] sm:max-h-[270px] w-full h-auto object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.08)]"
                             />
                           </div>
 
@@ -418,7 +425,7 @@ export default function ShopView({
                             <div className="absolute bottom-3 inset-x-3 translate-y-12 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-10">
                               <button
                                 onClick={() => onAddToCart(p, p.colors[0])}
-                                className="w-full bg-[#150d0a] hover:bg-black text-[#f5f0e6] hover:text-white text-[9px] tracking-widest font-bold uppercase py-2.5 transition-colors duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                                className="w-full bg-[#150d0a] hover:bg-black text-[#f5f0e6] hover:text-white text-[9px] tracking-widest font-bold uppercase py-2.5 transition-colors duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md rounded-lg"
                                 id={`shop-quick-add-${p.id}`}
                               >
                                 <ShoppingCart className="w-3 h-3" />
@@ -436,7 +443,7 @@ export default function ShopView({
 
                           <button
                             onClick={() => onProductClick(p.id)}
-                            className="text-left font-serif-elegant text-sm font-light text-[#1a120e] hover:text-[#f59e0b] transition-colors focus:outline-none cursor-pointer mb-1"
+                            className="text-left font-serif-elegant text-sm font-bold text-[#1a120e] hover:text-[#f59e0b] transition-colors focus:outline-none cursor-pointer mb-1"
                             id={`shop-title-${p.id}`}
                           >
                             {p.name}
@@ -454,14 +461,21 @@ export default function ShopView({
                             <span className="text-xs text-[#1a120e]/50 font-semibold">({p.reviewsCount})</span>
                           </div>
 
-                          <div className="mt-auto flex items-center justify-between pt-2 border-t border-[#efeae0]/40">
-                            <span 
-                              className="text-lg sm:text-xl font-serif-elegant text-black"
-                              style={{ fontWeight: 950 }}
-                            >
-                              ${p.price.toFixed(2)} USD
-                            </span>
-                            <span className="text-[9px] font-medium text-[#1a120e]/40 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
+                          <div className="mt-auto flex items-baseline justify-between pt-2 border-t border-[#efeae0]/40 flex-wrap gap-1">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span 
+                                className="text-lg sm:text-xl font-serif-elegant text-black"
+                                style={{ fontWeight: 950 }}
+                              >
+                                ${p.price.toFixed(2)} USD
+                              </span>
+                              {p.originalPrice && p.originalPrice > p.price && (
+                                <span className="text-xs font-serif-elegant text-[#1a120e]/40 line-through">
+                                  ${p.originalPrice.toFixed(2)} USD
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold text-[#1a120e]/60 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
                               Explorar
                             </span>
                           </div>

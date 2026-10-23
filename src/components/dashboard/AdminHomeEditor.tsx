@@ -25,7 +25,7 @@ export default function AdminHomeEditor({
   showToast
 }: AdminHomeEditorProps) {
   const [form, setForm] = useState<HomeContent>({ ...content });
-  const [activeSubTab, setActiveSubTab] = useState<'hero' | 'sections' | 'footer'>('hero');
+  const [activeSubTab, setActiveSubTab] = useState<'hero' | 'sections' | 'store' | 'footer'>('hero');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
@@ -175,6 +175,19 @@ export default function AdminHomeEditor({
 
         <button
           type="button"
+          onClick={() => setActiveSubTab('store')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === 'store'
+              ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+              : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Layout className="w-3.5 h-3.5" />
+          <span>3. Filtro de Precios de Tienda</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('footer')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
             activeSubTab === 'footer'
@@ -183,7 +196,7 @@ export default function AdminHomeEditor({
           }`}
         >
           <Mail className="w-3.5 h-3.5" />
-          <span>3. Footer & Contacto Global</span>
+          <span>4. Footer & Contacto Global</span>
         </button>
       </div>
 
@@ -606,7 +619,44 @@ export default function AdminHomeEditor({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 3: FOOTER & CONTACTO GLOBAL */}
+        {/* TAB 3: AJUSTES DE TIENDA Y FILTRO DE PRECIOS */}
+        {/* ============================================================ */}
+        {activeSubTab === 'store' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-widest">
+                <Sparkles className="w-4 h-4" />
+                <span>Configuración de Filtro de Precios de la Tienda</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Rango de Precio Máximo de la Tienda ($ USD)
+                </label>
+                <input
+                  type="number"
+                  min="100"
+                  max="10000"
+                  step="50"
+                  value={form.storeMaxPrice || 1000}
+                  onChange={(e) => setForm(prev => ({ ...prev, storeMaxPrice: Number(e.target.value) || 1000 }))}
+                  placeholder="1000"
+                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all font-mono"
+                />
+                <p className="text-[11px] text-zinc-400 mt-2 font-light leading-relaxed">
+                  Cambia este valor para ajustar el límite superior del filtro de rango de precios de la Tienda (ej: $500, $1000, $2500 USD).
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ============================================================ */}
+        {/* TAB 4: FOOTER & CONTACTO GLOBAL */}
         {/* ============================================================ */}
         {activeSubTab === 'footer' && (
           <motion.div

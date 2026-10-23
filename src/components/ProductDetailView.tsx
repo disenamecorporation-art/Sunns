@@ -12,8 +12,8 @@ import { normalizeProduct } from '../lib/dbService';
 interface ProductDetailViewProps {
   productId: string;
   onBack: () => void;
-  onAddToCart: (product: Product, color: ProductColor, quantity: number) => void;
-  onBuyNow: (product: Product, color: ProductColor, quantity: number) => void;
+  onAddToCart: (product: Product, color: ProductColor, quantity: number, selectedLens?: string) => void;
+  onBuyNow: (product: Product, color: ProductColor, quantity: number, selectedLens?: string) => void;
   onToggleFavorite: (product: Product) => void;
   favorites: Product[];
   onProductClick: (id: string) => void;
@@ -35,15 +35,26 @@ export default function ProductDetailView({
   const product = useMemo(() => normalizeProduct(rawProduct), [rawProduct]);
 
   const defaultColor = product.colors[0] || { name: 'Negro', value: '#1A1A1A' };
+  const lensOpts = product.lensOptions && product.lensOptions.length > 0
+    ? product.lensOptions
+    : ['Lente Solar Oscuro', 'Lente Óptico Transparente'];
+
   const [mainImage, setMainImage] = useState(product.image);
   const [selectedColor, setSelectedColor] = useState<ProductColor>(defaultColor);
+  const [selectedLens, setSelectedLens] = useState<string>(lensOpts[0]);
+  const [activeMedia, setActiveMedia] = useState<'image' | 'video'>('image');
   const [quantity, setQuantity] = useState(1);
 
   // Sync state if current product ID shifts
   useEffect(() => {
     const activeCol = product.colors[0] || { name: 'Negro', value: '#1A1A1A' };
+    const activeL = product.lensOptions && product.lensOptions.length > 0
+      ? product.lensOptions[0]
+      : 'Lente Solar Oscuro';
     setMainImage(product.image);
     setSelectedColor(activeCol);
+    setSelectedLens(activeL);
+    setActiveMedia('image');
     setQuantity(1);
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -74,9 +85,9 @@ export default function ProductDetailView({
         </button>
 
         {/* Product Details Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
           
-          {/* LEFT: IMAGE GALLERY (lg:col-span-7) */}
+          {/* LEFT: IMAGE & VIDEO GALLERY (lg:col-span-7) */}
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-4">
             
             {/* Thumbnails (Left side of gallery on desktop) */}
@@ -84,9 +95,9 @@ export default function ProductDetailView({
               {product.images.map((imgUrl, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setMainImage(imgUrl)}
-                  className={`aspect-square w-16 sm:w-full bg-[#faf9f6] border rounded-lg flex items-center justify-center p-2.5 transition-all focus:outline-none cursor-pointer ${
-                    mainImage === imgUrl ? 'border-[#1a120e] ring-1 ring-[#1a120e]' : 'border-[#efeae0] hover:border-[#1a120e]/30'
+                  onClick={() => { setMainImage(imgUrl); setActiveMedia('image'); }}
+                  className={`aspect-square w-16 sm:w-full bg-[#faf9f6] border rounded-xl flex items-center justify-center p-1.5 transition-all focus:outline-none cursor-pointer ${
+                    activeMedia === 'image' && mainImage === imgUrl ? 'border-[#1a120e] ring-2 ring-[#1a120e]' : 'border-[#efeae0] hover:border-[#1a120e]/40'
                   }`}
                   id={`thumbnail-${idx}`}
                 >
@@ -100,31 +111,71 @@ export default function ProductDetailView({
                         target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
                       }
                     }}
-                    className="max-h-full max-w-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)]"
+                    className="max-h-full max-w-full object-contain filter drop-shadow-sm"
                   />
                 </button>
               ))}
+
+              {/* Video Thumbnail Button if present */}
+              {product.videoUrl && (
+                <button
+                  onClick={() => setActiveMedia('video')}
+                  className={`aspect-square w-16 sm:w-full bg-neutral-900 text-white border rounded-xl flex flex-col items-center justify-center p-2 transition-all focus:outline-none cursor-pointer ${
+                    activeMedia === 'video' ? 'border-amber-400 ring-2 ring-amber-400' : 'border-neutral-700 hover:border-white'
+                  }`}
+                  id="thumbnail-video"
+                >
+                  <span className="text-base sm:text-lg">▶️</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-300 mt-0.5">Video</span>
+                </button>
+              )}
             </div>
 
-            {/* Main Image Viewport (Right side of gallery on desktop) */}
-            <div className="sm:col-span-10 order-1 sm:order-2 bg-white border border-[#efeae0] rounded-xl aspect-square w-full flex items-center justify-center p-10 relative shadow-sm">
-              <img
-                src={mainImage}
-                alt={product.name}
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
-                    target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
-                  }
-                }}
-                className="max-h-[380px] w-auto object-contain filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.08)] transform hover:scale-105 transition-transform duration-500"
-              />
+            {/* Main Image/Video Viewport (Expanded, full-scale frame) */}
+            <div className="sm:col-span-10 order-1 sm:order-2 bg-white border border-[#efeae0] rounded-2xl p-2 sm:p-4 min-h-[420px] sm:min-h-[520px] w-full flex items-center justify-center relative shadow-sm overflow-hidden">
+              {activeMedia === 'video' && product.videoUrl ? (
+                product.videoUrl.includes('youtube.com') || product.videoUrl.includes('youtu.be') ? (
+                  <iframe
+                    src={product.videoUrl.replace('watch?v=', 'embed/')}
+                    title={`Video ${product.name}`}
+                    className="w-full h-full min-h-[450px] rounded-xl border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={product.videoUrl}
+                    controls
+                    autoPlay
+                    className="w-full h-full max-h-[550px] object-contain rounded-xl bg-black"
+                  />
+                )
+              ) : (
+                <img
+                  src={mainImage}
+                  alt={product.name}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                      target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                    }
+                  }}
+                  className="max-h-[480px] sm:max-h-[560px] w-full h-auto object-contain filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.12)] transform hover:scale-103 transition-transform duration-500"
+                />
+              )}
 
               {/* Tag for featured */}
               {product.featured && (
-                <div className="absolute top-6 left-6 bg-[#1a120e] text-[#f5f0e6] text-[8px] tracking-[0.15em] uppercase font-bold px-2.5 py-1">
+                <div className="absolute top-5 left-5 bg-[#1a120e] text-[#f5f0e6] text-[9px] tracking-[0.15em] uppercase font-bold px-3 py-1 rounded shadow-md z-10">
                   Colección Especial
+                </div>
+              )}
+
+              {/* Discount Tag Badge if on sale */}
+              {product.originalPrice && product.originalPrice > product.price && (
+                <div className="absolute top-5 right-5 bg-amber-400 text-black text-[10px] tracking-wider uppercase font-black px-3 py-1 rounded-full shadow-md z-10 border border-amber-300">
+                  OFERTA -{Math.round((1 - product.price / product.originalPrice) * 100)}%
                 </div>
               )}
             </div>
@@ -132,21 +183,21 @@ export default function ProductDetailView({
           </div>
 
           {/* RIGHT: CONFIG & ORDER (lg:col-span-5) */}
-          <div className="lg:col-span-5 space-y-8 bg-white border border-[#efeae0] rounded-xl p-8 shadow-sm">
+          <div className="lg:col-span-5 space-y-7 bg-white border border-[#efeae0] rounded-2xl p-6 sm:p-8 shadow-sm">
             
             {/* Header: Category & Title */}
-            <div className="space-y-2 border-b border-[#faf9f6] pb-6">
+            <div className="space-y-2 border-b border-[#faf9f6] pb-5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] tracking-[0.3em] text-[#1a120e] font-bold uppercase">
                   Lentes {product.category} / Premium
                 </span>
                 <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                  product.inStock ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                  product.inStock ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'
                 }`}>
                   {product.inStock ? 'En Stock' : 'Agotado'}
                 </span>
               </div>
-              <h1 className="font-serif-elegant text-2xl sm:text-3xl font-light text-[#1a120e] leading-tight">
+              <h1 className="font-serif-elegant text-2xl sm:text-3xl font-bold text-[#1a120e] leading-tight">
                 {product.name}
               </h1>
               
@@ -166,22 +217,34 @@ export default function ProductDetailView({
               </div>
             </div>
 
-            {/* Price */}
+            {/* Price Display with Discount Support */}
             <div className="space-y-1">
-              <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold">Precio Unitario</span>
-              <div 
-                className="text-3xl sm:text-4xl lg:text-5xl font-serif-elegant text-black mt-1"
-                style={{ fontWeight: 950 }}
-              >
-                ${product.price.toFixed(2)} USD
+              <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold block">Precio del Modelo</span>
+              <div className="flex items-baseline gap-3 flex-wrap mt-1">
+                <span 
+                  className="text-3xl sm:text-4xl lg:text-5xl font-serif-elegant text-black"
+                  style={{ fontWeight: 950 }}
+                >
+                  ${product.price.toFixed(2)} USD
+                </span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <>
+                    <span className="text-base sm:text-2xl font-serif-elegant text-[#1a120e]/40 line-through font-normal">
+                      ${product.originalPrice.toFixed(2)} USD
+                    </span>
+                    <span className="bg-amber-400/20 text-amber-900 border border-amber-400/40 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full">
+                      -{Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
+                    </span>
+                  </>
+                )}
               </div>
-              <p className="text-[10px] text-green-700 font-medium flex items-center gap-1">
+              <p className="text-[10px] text-green-700 font-medium flex items-center gap-1 pt-1">
                 <Truck className="w-3.5 h-3.5" /> Envíos exprés gratuitos a todo el mundo
               </p>
             </div>
 
             {/* Description */}
-            <div className="space-y-3 border-t border-b border-[#faf9f6] py-5">
+            <div className="space-y-3 border-t border-b border-[#faf9f6] py-4">
               <p className="text-xs text-[#1a120e]/75 leading-relaxed font-light">
                 {product.description}
               </p>
@@ -198,10 +261,10 @@ export default function ProductDetailView({
             </div>
 
             {/* Colors Variant Configurator */}
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold">Variante de Montura</span>
-                <span className="text-xs font-medium text-[#1a120e]">{selectedColor?.name || 'Negro'}</span>
+                <span className="text-xs font-semibold text-[#1a120e]">{selectedColor?.name || 'Negro'}</span>
               </div>
               <div className="flex gap-3">
                 {(product.colors || []).map((color, idx) => {
@@ -212,6 +275,7 @@ export default function ProductDetailView({
                   return (
                     <button
                       key={`${cName}-${idx}`}
+                      type="button"
                       onClick={() => setSelectedColor({ name: cName, value: cValue })}
                       className={`w-9 h-9 rounded-full border flex items-center justify-center relative transition-all focus:outline-none cursor-pointer hover:scale-105 ${
                         isColorActive ? 'border-[#1a120e] ring-2 ring-[#efeae0]' : 'border-[#efeae0]'
@@ -234,8 +298,38 @@ export default function ProductDetailView({
               </div>
             </div>
 
+            {/* Lens Option Configurator */}
+            <div className="space-y-3 pt-3 border-t border-[#faf9f6]">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold">
+                  Tipo de Cristal / Lente
+                </span>
+                <span className="text-xs font-semibold text-[#1a120e]">{selectedLens}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {lensOpts.map((lens) => {
+                  const isLensActive = selectedLens === lens;
+                  return (
+                    <button
+                      key={lens}
+                      type="button"
+                      onClick={() => setSelectedLens(lens)}
+                      className={`px-3.5 py-2.5 rounded-xl border text-xs font-medium text-left transition-all flex items-center justify-between cursor-pointer ${
+                        isLensActive
+                          ? 'bg-[#1a120e] text-white border-[#1a120e] shadow-sm'
+                          : 'bg-[#faf9f6] text-[#1a120e]/80 border-[#efeae0] hover:border-[#1a120e]/40'
+                      }`}
+                    >
+                      <span>{lens}</span>
+                      {isLensActive && <span className="text-xs font-bold text-amber-300">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Quantity Config & Favorites Trigger */}
-            <div className="space-y-4">
+            <div className="space-y-3 pt-2">
               <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold block">Cantidad</span>
               
               <div className="flex items-center gap-4">
@@ -276,20 +370,20 @@ export default function ProductDetailView({
             </div>
 
             {/* Buy / Cart Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
-                onClick={() => onAddToCart(product, selectedColor, quantity)}
+                onClick={() => onAddToCart(product, selectedColor, quantity, selectedLens)}
                 disabled={!product.inStock}
-                className="flex-1 bg-transparent border border-[#1a120e] hover:bg-[#1a120e]/5 text-[#1a120e] text-xs font-bold tracking-widest uppercase py-4 transition-colors disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 bg-transparent border border-[#1a120e] hover:bg-[#1a120e]/5 text-[#1a120e] text-xs font-bold tracking-widest uppercase py-4 transition-colors disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center gap-2 cursor-pointer rounded-xl"
                 id="detail-add-cart-btn"
               >
                 <ShoppingBag className="w-4 h-4" />
                 Agregar al Carrito
               </button>
               <button
-                onClick={() => onBuyNow(product, selectedColor, quantity)}
+                onClick={() => onBuyNow(product, selectedColor, quantity, selectedLens)}
                 disabled={!product.inStock}
-                className="flex-1 bg-[#1a120e] hover:bg-black text-[#f5f0e6] hover:text-white text-xs font-bold tracking-widest uppercase py-4 transition-colors disabled:opacity-40 disabled:hover:bg-[#1a120e] shadow-lg shadow-[#1a120e]/10 cursor-pointer"
+                className="flex-1 bg-[#1a120e] hover:bg-black text-[#f5f0e6] hover:text-white text-xs font-bold tracking-widest uppercase py-4 transition-colors disabled:opacity-40 disabled:hover:bg-[#1a120e] shadow-lg shadow-[#1a120e]/10 cursor-pointer rounded-xl"
                 id="detail-buy-now-btn"
               >
                 Comprar Ahora

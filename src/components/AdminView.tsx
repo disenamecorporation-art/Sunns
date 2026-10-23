@@ -996,7 +996,7 @@ export default function AdminView({
                       </div>
 
                       <div>
-                        <label className="block text-neutral-700 font-semibold mb-1">Precio (USD)</label>
+                        <label className="block text-neutral-700 font-semibold mb-1">Precio Actual / Oferta ($ USD)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -1004,6 +1004,19 @@ export default function AdminView({
                           value={editingProduct.price}
                           onChange={e => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono"
+                          placeholder="185.00"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-semibold mb-1">Precio Regular Anterior ($ USD - Opcional para Descuento)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingProduct.originalPrice || ''}
+                          onChange={e => setEditingProduct({ ...editingProduct, originalPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
+                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono placeholder:font-sans"
+                          placeholder="Ej: 250.00 (Muestra etiqueta de Descuento)"
                         />
                       </div>
 
@@ -1032,18 +1045,75 @@ export default function AdminView({
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="block text-neutral-700 font-semibold mb-1">URL de la Imagen Principal</label>
+                        <label className="block text-neutral-700 font-semibold mb-1">
+                          Opciones de Cristal / Tipo de Lente (Separadas por comas)
+                        </label>
+                        <input
+                          type="text"
+                          value={(editingProduct.lensOptions || []).join(', ')}
+                          onChange={e => {
+                            const opts = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                            setEditingProduct({ ...editingProduct, lensOptions: opts });
+                          }}
+                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none"
+                          placeholder="Ej: Lente Solar Oscuro, Lente Óptico Transparente, Polarizado HD"
+                        />
+                        <p className="text-[10px] text-neutral-500 mt-1">
+                          Permite a los clientes elegir el cristal deseado dentro del mismo modelo de lentes.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-semibold mb-1">URL de Imagen Principal</label>
                         <input
                           type="url"
                           required
                           value={editingProduct.image}
-                          onChange={e => setEditingProduct({ 
-                            ...editingProduct, 
-                            image: e.target.value,
-                            images: [e.target.value, ...(editingProduct.images?.slice(1) || [])]
-                          })}
+                          onChange={e => {
+                            const newImg = e.target.value;
+                            const otherImgs = (editingProduct.images || []).filter(img => img !== editingProduct.image);
+                            setEditingProduct({ 
+                              ...editingProduct, 
+                              image: newImg,
+                              images: [newImg, ...otherImgs]
+                            });
+                          }}
                           className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px]"
                           placeholder="https://images.unsplash.com/..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-semibold mb-1">URL de Video (Opcional - MP4 o YouTube)</label>
+                        <input
+                          type="text"
+                          value={editingProduct.videoUrl || ''}
+                          onChange={e => setEditingProduct({ ...editingProduct, videoUrl: e.target.value })}
+                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px]"
+                          placeholder="https://...mp4 o https://youtube.com/..."
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-neutral-700 font-semibold mb-1">
+                          Galería de Imágenes Adicionales (1 URL por línea o separadas por comas)
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={(editingProduct.images || []).join('\n')}
+                          onChange={e => {
+                            const lines = e.target.value
+                              .split(/[\n,]+/)
+                              .map(s => s.trim())
+                              .filter(Boolean);
+                            setEditingProduct({ 
+                              ...editingProduct, 
+                              image: lines[0] || editingProduct.image,
+                              images: lines.length > 0 ? lines : [editingProduct.image] 
+                            });
+                          }}
+                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px] leading-relaxed"
+                          placeholder="Pega aquí múltiples enlaces de imágenes de Postimages para que aparezcan en la galería..."
                         />
                       </div>
 

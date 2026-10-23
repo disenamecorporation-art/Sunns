@@ -175,7 +175,7 @@ export default function CartDrawer({
                                 </button>
                               </div>
                               
-                              <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 <span
                                   className="w-2.5 h-2.5 rounded-full border border-black/10"
                                   style={{ backgroundColor: cValue }}
@@ -183,6 +183,11 @@ export default function CartDrawer({
                                 <span className="text-[10px] text-black/60 font-light">
                                   {cName}
                                 </span>
+                                {item.selectedLens && (
+                                  <span className="text-[9px] bg-[#1a120e]/5 text-[#1a120e] border border-[#efeae0] px-2 py-0.5 rounded-md font-medium">
+                                    {item.selectedLens}
+                                  </span>
+                                )}
                               </div>
                             </div>
 

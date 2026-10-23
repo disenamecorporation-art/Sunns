@@ -42,6 +42,9 @@ export interface HomeContent {
   testimonialsTag: string;
   testimonialsTitle: string;
 
+  // Store Settings
+  storeMaxPrice?: number;
+
   // Footer Section
   footerBrandDescription: string;
   footerNewsletterTag: string;
@@ -53,6 +56,8 @@ export interface HomeContent {
 }
 
 export const DEFAULT_HOME_CONTENT: HomeContent = {
+  // Store Settings
+  storeMaxPrice: 1000,
   // Hero Section
   heroEditorialTag: 'NUEVA COLECCIÓN',
   heroFloatingTitle1: 'MIRA EL MUNDO',

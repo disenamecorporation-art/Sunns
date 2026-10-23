@@ -12,13 +12,16 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  originalPrice?: number; // Precio regular anterior / precio sin descuento
   category: string;
   subcategory?: string;
   description: string;
   details: string[];
   image: string;
   images: string[];
+  videoUrl?: string; // URL opcional de video (MP4 o YouTube)
   colors: ProductColor[];
+  lensOptions?: string[]; // Opciones de tipo de cristal/lente para el mismo modelo
   inStock: boolean;
   featured: boolean;
   rating: number;
@@ -143,6 +146,7 @@ export interface CartItem {
   product: Product;
   quantity: number;
   selectedColor: ProductColor;
+  selectedLens?: string;
 }
 
 export interface Review {

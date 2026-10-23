@@ -308,17 +308,42 @@ export function normalizeProduct(raw: any): Product {
     normalizedImages.push(image);
   }
 
+  // Parse videoUrl
+  const videoUrl = (raw.video_url || raw.videoUrl || '').trim() || undefined;
+
+  // Parse original price
+  const rawOrig = raw.original_price ?? raw.originalPrice;
+  const originalPrice = rawOrig && Number(rawOrig) > 0 ? Number(rawOrig) : undefined;
+
+  // Parse lens options
+  let rawLens = raw.lens_options ?? raw.lensOptions;
+  if (typeof rawLens === 'string') {
+    try {
+      rawLens = JSON.parse(rawLens);
+    } catch {
+      rawLens = rawLens.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(rawLens)) rawLens = [];
+  const normalizedLens = rawLens.map(l => String(l || '').trim()).filter(Boolean);
+  if (normalizedLens.length === 0) {
+    normalizedLens.push('Lente Solar Oscuro', 'Lente Óptico Transparente');
+  }
+
   return {
     id: String(raw.id || `prod_${Date.now()}`),
     name: String(raw.name || 'Modelo Central'),
     price: Number(raw.price || 150),
+    originalPrice: originalPrice && originalPrice > Number(raw.price || 150) ? originalPrice : undefined,
     category: String(raw.category || 'Sol'),
     subcategory: raw.subcategory ? String(raw.subcategory) : undefined,
     description: String(raw.description || 'Lentes de sol artesanales de alta gama.'),
     details: normalizedDetails,
     image,
     images: normalizedImages,
+    videoUrl,
     colors: normalizedColors,
+    lensOptions: normalizedLens,
     inStock: Boolean(raw.in_stock ?? raw.inStock ?? true),
     featured: Boolean(raw.featured ?? false),
     rating: Number(raw.rating || 5.0),
@@ -361,13 +386,16 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
       id: product.id,
       name: product.name,
       price: product.price,
+      original_price: product.originalPrice || null,
       category: product.category,
       subcategory: product.subcategory || null,
       description: product.description || '',
       details: product.details || [],
       image: product.image,
       images: product.images || [product.image],
+      video_url: product.videoUrl || null,
       colors: product.colors || [],
+      lens_options: product.lensOptions || [],
       in_stock: product.inStock ?? true,
       featured: product.featured ?? false,
       rating: product.rating || 5.0,
