@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Plus, Minus, Star, Heart, ShoppingBag, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product, ProductColor } from '../types';
+import { normalizeProduct } from '../lib/dbService';
 
 interface ProductDetailViewProps {
   productId: string;
@@ -29,17 +30,20 @@ export default function ProductDetailView({
   onProductClick,
   products,
 }: ProductDetailViewProps) {
-  // Find current product
-  const product = products.find((p) => p.id === productId) || products[0];
+  // Find current product safely with defensive normalization
+  const rawProduct = products.find((p) => p.id === productId) || products[0];
+  const product = useMemo(() => normalizeProduct(rawProduct), [rawProduct]);
 
+  const defaultColor = product.colors[0] || { name: 'Negro', value: '#1A1A1A' };
   const [mainImage, setMainImage] = useState(product.image);
-  const [selectedColor, setSelectedColor] = useState<ProductColor>(product.colors[0]);
+  const [selectedColor, setSelectedColor] = useState<ProductColor>(defaultColor);
   const [quantity, setQuantity] = useState(1);
 
-  // Sync state if current product ID shifts (e.g. clicking a related product)
+  // Sync state if current product ID shifts
   useEffect(() => {
+    const activeCol = product.colors[0] || { name: 'Negro', value: '#1A1A1A' };
     setMainImage(product.image);
-    setSelectedColor(product.colors[0]);
+    setSelectedColor(activeCol);
     setQuantity(1);
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -90,6 +94,12 @@ export default function ProductDetailView({
                     src={imgUrl}
                     alt={`${product.name} vista ${idx + 1}`}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                        target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                      }
+                    }}
                     className="max-h-full max-w-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)]"
                   />
                 </button>
@@ -102,6 +112,12 @@ export default function ProductDetailView({
                 src={mainImage}
                 alt={product.name}
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                    target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                  }
+                }}
                 className="max-h-[380px] w-auto object-contain filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.08)] transform hover:scale-105 transition-transform duration-500"
               />
 
@@ -185,24 +201,27 @@ export default function ProductDetailView({
             <div className="space-y-3.5">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] tracking-widest text-[#1a120e]/45 uppercase font-bold">Variante de Montura</span>
-                <span className="text-xs font-medium text-[#1a120e]">{selectedColor.name}</span>
+                <span className="text-xs font-medium text-[#1a120e]">{selectedColor?.name || 'Negro'}</span>
               </div>
               <div className="flex gap-3">
-                {product.colors.map((color) => {
-                  const isColorActive = selectedColor.name === color.name;
+                {(product.colors || []).map((color, idx) => {
+                  const cName = color?.name || 'Negro';
+                  const cValue = color?.value || '#1A1A1A';
+                  const isColorActive = (selectedColor?.name || '') === cName;
+                  const colorSlug = String(cName).toLowerCase().replace(/\s+/g, '-');
                   return (
                     <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color)}
+                      key={`${cName}-${idx}`}
+                      onClick={() => setSelectedColor({ name: cName, value: cValue })}
                       className={`w-9 h-9 rounded-full border flex items-center justify-center relative transition-all focus:outline-none cursor-pointer hover:scale-105 ${
                         isColorActive ? 'border-[#1a120e] ring-2 ring-[#efeae0]' : 'border-[#efeae0]'
                       }`}
-                      title={color.name}
-                      id={`color-option-${color.name.toLowerCase().replace(' ', '-')}`}
+                      title={cName}
+                      id={`color-option-${colorSlug}`}
                     >
                       <span
                         className="w-6.5 h-6.5 rounded-full border border-black/5"
-                        style={{ backgroundColor: color.value }}
+                        style={{ backgroundColor: cValue }}
                       />
                       {isColorActive && (
                         <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">

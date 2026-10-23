@@ -138,44 +138,53 @@ export default function CartDrawer({
                   ) : null}
 
                   <div className="divide-y divide-[#efeae0]">
-                    {cart.map((item, index) => (
-                      <div key={`${item.product.id}-${item.selectedColor.name}-${index}`} className="py-4 flex gap-4">
-                        {/* Product Thumbnail */}
-                        <div className="w-20 h-20 bg-[#faf9f6] border border-[#efeae0] rounded-lg p-2 flex items-center justify-center shrink-0">
-                          <img
-                            src={item.product.image}
-                            alt={item.product.name}
-                            className="w-full h-full object-contain"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-
-                        {/* Item Details */}
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-serif-elegant font-bold text-xs text-black">
-                                {item.product.name}
-                              </h3>
-                              <button
-                                onClick={() => onRemoveItem(index)}
-                                className="text-black/40 hover:text-red-600 p-1 transition-colors cursor-pointer"
-                                aria-label="Eliminar producto"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full border border-black/10"
-                                style={{ backgroundColor: item.selectedColor.value }}
-                              />
-                              <span className="text-[10px] text-black/60 font-light">
-                                {item.selectedColor.name}
-                              </span>
-                            </div>
+                    {cart.map((item, index) => {
+                      const cName = item.selectedColor?.name || 'Negro';
+                      const cValue = item.selectedColor?.value || '#1A1A1A';
+                      return (
+                        <div key={`${item.product?.id || index}-${cName}-${index}`} className="py-4 flex gap-4">
+                          {/* Product Thumbnail */}
+                          <div className="w-20 h-20 bg-[#faf9f6] border border-[#efeae0] rounded-lg p-2 flex items-center justify-center shrink-0">
+                            <img
+                              src={item.product?.image || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80'}
+                              alt={item.product?.name || 'Producto'}
+                              className="w-full h-full object-contain"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (!target.src.includes('photo-1511499767150-a48a237f0083')) {
+                                  target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                                }
+                              }}
+                            />
                           </div>
+
+                          {/* Item Details */}
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <h3 className="font-serif-elegant font-bold text-xs text-black">
+                                  {item.product?.name || 'Lentes Sunns'}
+                                </h3>
+                                <button
+                                  onClick={() => onRemoveItem(index)}
+                                  className="text-black/40 hover:text-red-600 p-1 transition-colors cursor-pointer"
+                                  aria-label="Eliminar producto"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/10"
+                                  style={{ backgroundColor: cValue }}
+                                />
+                                <span className="text-[10px] text-black/60 font-light">
+                                  {cName}
+                                </span>
+                              </div>
+                            </div>
 
                           <div className="flex justify-between items-center mt-2">
                             {/* Quantity Controls */}
@@ -206,7 +215,8 @@ export default function CartDrawer({
                           </div>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 </div>
               )}

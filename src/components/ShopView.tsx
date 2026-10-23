@@ -117,9 +117,12 @@ export default function ShopView({
 
       // 4. Color Filter
       if (selectedColors.length > 0) {
-        const productColors = p.colors.map((c) => c.name.toLowerCase());
+        const productColors = (p.colors || []).map((c) => {
+          if (typeof c === 'string') return String(c).toLowerCase();
+          return String(c?.name || '').toLowerCase();
+        });
         const hasMatchingColor = selectedColors.some((colorName) =>
-          productColors.some((pColor) => pColor.includes(colorName.toLowerCase()))
+          productColors.some((pColor) => pColor.includes(String(colorName || '').toLowerCase()))
         );
         if (!hasMatchingColor) return false;
       }

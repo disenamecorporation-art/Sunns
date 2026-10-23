@@ -4,7 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Product, Category, User, Order, SavedAddress, SavedPaymentMethod, OpticalPrescription, HomeContent } from '../types';
+import { Product, ProductColor, Category, User, Order, SavedAddress, SavedPaymentMethod, OpticalPrescription, HomeContent } from '../types';
 import { PRODUCTS as SEED_PRODUCTS } from '../data/products';
 import { DEFAULT_CATEGORIES as SEED_CATEGORIES } from '../data/categories';
 import { DEFAULT_HOME_CONTENT } from '../data/homeContent';
@@ -227,6 +227,105 @@ export interface AdminOrderEntry {
 // 1. PRODUCTS DATABASE OPERATIONS
 // ==========================================
 
+export function getColorHexByName(name: string): string {
+  if (!name || typeof name !== 'string') return '#1A1A1A';
+  const n = name.toLowerCase();
+  if (n.includes('oro') || n.includes('dorad')) return '#D4AF37';
+  if (n.includes('plata') || n.includes('silver')) return '#C0C0C0';
+  if (n.includes('champan') || n.includes('champag')) return '#EEDC82';
+  if (n.includes('carey') || n.includes('tortoise')) return '#5C4033';
+  if (n.includes('gris') || n.includes('gray') || n.includes('grey')) return '#7F8C8D';
+  if (n.includes('azul') || n.includes('blue')) return '#1A5F7A';
+  if (n.includes('rojo') || n.includes('red')) return '#A93226';
+  if (n.includes('verdes') || n.includes('verde') || n.includes('green')) return '#1E8449';
+  if (n.includes('blanc') || n.includes('white')) return '#FFFFFF';
+  return '#1A1A1A';
+}
+
+export function normalizeProduct(raw: any): Product {
+  if (!raw) {
+    return {
+      id: `prod_default`,
+      name: 'Lentes Sunns Premium',
+      price: 150,
+      category: 'Sol',
+      description: 'Edición limitada artesanal con protección UV400 completa.',
+      details: ['Protección UV400', 'Material ligero de alta densidad'],
+      image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80',
+      images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80'],
+      colors: [{ name: 'Negro', value: '#1A1A1A' }],
+      inStock: true,
+      featured: false,
+      rating: 5.0,
+      reviewsCount: 15,
+    };
+  }
+
+  const image = String(raw.image || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80');
+
+  // Parse colors defensively
+  let rawColors = raw.colors;
+  if (typeof rawColors === 'string') {
+    try { rawColors = JSON.parse(rawColors); } catch { rawColors = []; }
+  }
+  if (!Array.isArray(rawColors)) rawColors = [];
+
+  const normalizedColors: ProductColor[] = rawColors.map((c: any) => {
+    if (typeof c === 'string' && c.trim()) {
+      return { name: c.trim(), value: getColorHexByName(c) };
+    }
+    if (c && typeof c === 'object') {
+      const name = String(c.name || c.label || 'Negro').trim();
+      const value = String(c.value || c.hex || c.color || getColorHexByName(name)).trim();
+      return { name, value };
+    }
+    return { name: 'Negro', value: '#1A1A1A' };
+  });
+
+  if (normalizedColors.length === 0) {
+    normalizedColors.push({ name: 'Negro', value: '#1A1A1A' });
+  }
+
+  // Parse details defensively
+  let rawDetails = raw.details;
+  if (typeof rawDetails === 'string') {
+    try { rawDetails = JSON.parse(rawDetails); } catch { rawDetails = [rawDetails]; }
+  }
+  if (!Array.isArray(rawDetails)) rawDetails = [];
+  const normalizedDetails = rawDetails.map(d => String(d || '')).filter(Boolean);
+  if (normalizedDetails.length === 0) {
+    normalizedDetails.push('Diseño artesanal italiano de alta durabilidad', 'Protección UV400 integral');
+  }
+
+  // Parse images defensively
+  let rawImages = raw.images;
+  if (typeof rawImages === 'string') {
+    try { rawImages = JSON.parse(rawImages); } catch { rawImages = [rawImages]; }
+  }
+  if (!Array.isArray(rawImages)) rawImages = [];
+  const normalizedImages = rawImages.map(img => String(img || '')).filter(Boolean);
+  if (normalizedImages.length === 0) {
+    normalizedImages.push(image);
+  }
+
+  return {
+    id: String(raw.id || `prod_${Date.now()}`),
+    name: String(raw.name || 'Modelo Central'),
+    price: Number(raw.price || 150),
+    category: String(raw.category || 'Sol'),
+    subcategory: raw.subcategory ? String(raw.subcategory) : undefined,
+    description: String(raw.description || 'Lentes de sol artesanales de alta gama.'),
+    details: normalizedDetails,
+    image,
+    images: normalizedImages,
+    colors: normalizedColors,
+    inStock: Boolean(raw.in_stock ?? raw.inStock ?? true),
+    featured: Boolean(raw.featured ?? false),
+    rating: Number(raw.rating || 5.0),
+    reviewsCount: Number(raw.reviews_count || raw.reviewsCount || 12),
+  };
+}
+
 export async function dbGetProducts(): Promise<Product[]> {
   if (isSupabaseConfigured()) {
     try {
@@ -236,25 +335,7 @@ export async function dbGetProducts(): Promise<Product[]> {
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
-        // If Supabase returns records, the database is the authoritative source!
-        // NEVER merge hardcoded SEED_PRODUCTS here, otherwise deleted products will resurrect!
-        const dbFetched: Product[] = data.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          price: Number(row.price),
-          category: row.category,
-          subcategory: row.subcategory || undefined,
-          description: row.description || '',
-          details: Array.isArray(row.details) ? row.details : (typeof row.details === 'string' ? JSON.parse(row.details) : []),
-          image: row.image,
-          images: Array.isArray(row.images) ? row.images : (typeof row.images === 'string' ? JSON.parse(row.images) : [row.image]),
-          colors: Array.isArray(row.colors) ? row.colors : (typeof row.colors === 'string' ? JSON.parse(row.colors) : []),
-          inStock: Boolean(row.in_stock ?? row.inStock ?? true),
-          featured: Boolean(row.featured ?? false),
-          rating: Number(row.rating || 5.0),
-          reviewsCount: Number(row.reviews_count || row.reviewsCount || 0),
-        }));
-
+        const dbFetched: Product[] = data.map((row: any) => normalizeProduct(row));
         memProducts = dbFetched;
         return memProducts;
       }
@@ -264,7 +345,7 @@ export async function dbGetProducts(): Promise<Product[]> {
   }
 
   // Fallback to in-memory state (only used when cloud DB is not configured)
-  return [...memProducts];
+  return memProducts.map(normalizeProduct);
 }
 
 export async function dbSaveProduct(product: Product): Promise<Product> {
