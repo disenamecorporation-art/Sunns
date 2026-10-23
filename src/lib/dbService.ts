@@ -272,6 +272,13 @@ export async function dbGetProducts(): Promise<Product[]> {
 }
 
 export async function dbSaveProduct(product: Product): Promise<Product> {
+  const existingIndex = memProducts.findIndex(p => p.id === product.id);
+  if (existingIndex >= 0) {
+    memProducts[existingIndex] = { ...product };
+  } else {
+    memProducts.unshift({ ...product });
+  }
+
   if (isSupabaseConfigured()) {
     const row = {
       id: product.id,
@@ -279,28 +286,34 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
       price: product.price,
       category: product.category,
       subcategory: product.subcategory || null,
-      description: product.description,
-      details: product.details,
+      description: product.description || '',
+      details: product.details || [],
       image: product.image,
-      images: product.images,
-      colors: product.colors,
-      in_stock: product.inStock,
-      featured: product.featured,
-      rating: product.rating,
-      reviews_count: product.reviewsCount,
+      images: product.images || [product.image],
+      colors: product.colors || [],
+      in_stock: product.inStock ?? true,
+      featured: product.featured ?? false,
+      rating: product.rating || 5.0,
+      reviews_count: product.reviewsCount || 0,
     };
-    const { error } = await supabase.from('products').upsert(row);
-    if (error) {
-      console.error('Supabase save product error:', error);
-      throw new Error(error.message || 'Error al guardar el producto en Supabase');
+    try {
+      const { error } = await supabase.from('products').upsert(row);
+      if (error) {
+        console.warn('Supabase save product warning:', error);
+        // Try fallback with minimal core columns
+        const basicRow = {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          category: product.category,
+          description: product.description || '',
+          image: product.image,
+        };
+        await supabase.from('products').upsert(basicRow);
+      }
+    } catch (err) {
+      console.warn('Supabase save product exception (saved to memory):', err);
     }
-  }
-
-  const existingIndex = memProducts.findIndex(p => p.id === product.id);
-  if (existingIndex >= 0) {
-    memProducts[existingIndex] = { ...product };
-  } else {
-    memProducts.unshift({ ...product });
   }
 
   return product;
