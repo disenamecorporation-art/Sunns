@@ -43,6 +43,7 @@ export interface HomeContent {
   testimonialsTitle: string;
 
   // Store Settings
+  storeMinPrice?: number;
   storeMaxPrice?: number;
 
   // Footer Section
@@ -57,6 +58,7 @@ export interface HomeContent {
 
 export const DEFAULT_HOME_CONTENT: HomeContent = {
   // Store Settings
+  storeMinPrice: 20,
   storeMaxPrice: 1000,
   // Hero Section
   heroEditorialTag: 'NUEVA COLECCIÓN',

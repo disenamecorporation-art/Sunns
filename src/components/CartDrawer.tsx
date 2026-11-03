@@ -33,8 +33,9 @@ export default function CartDrawer({
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const shipping = 0; // Free express shipping
   const discountAmount = activeCoupon ? (subtotal * activeCoupon.discountPercent) / 100 : 0;
-  const total = Math.max(0, subtotal - discountAmount);
-  const estimatedTax = total * 0.10; // 10% VAT/IVA included in price
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const taxAmount = taxableAmount * 0.07; // 7% Impuestos de venta
+  const total = taxableAmount + taxAmount;
 
   return (
     <AnimatePresence>
@@ -253,6 +254,11 @@ export default function CartDrawer({
                       <span className="text-green-700 font-semibold">(Gratis)</span>
                     </span>
                     <span>$0.00 USD</span>
+                  </div>
+
+                  <div className="flex justify-between text-[#1a120e]/65">
+                    <span>Impuestos (7%)</span>
+                    <span>${taxAmount.toFixed(2)} USD</span>
                   </div>
 
                   <div className="border-t border-[#efeae0]/60 my-2 pt-2 flex justify-between text-base font-bold text-[#1a120e]">

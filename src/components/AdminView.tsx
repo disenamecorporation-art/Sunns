@@ -8,16 +8,17 @@ import {
   ShieldCheck, Package, ShoppingBag, Layers, Sparkles, Plus, 
   Trash2, Edit3, Check, X, Search, DollarSign, TrendingUp, 
   Truck, ArrowLeft, User as UserIcon, LogOut, CheckCircle2, 
-  AlertCircle, Eye, ExternalLink, Filter, ChevronRight, RefreshCw
+  AlertCircle, Eye, ExternalLink, Filter, ChevronRight, RefreshCw,
+  BookOpen, Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Product, Category, HomeContent, User, Order } from '../types';
+import { Product, Category, HomeContent, User, Order, ProductColor } from '../types';
 import { 
   dbGetOrders, dbUpdateOrderStatus, dbSaveProduct, 
   dbDeleteProduct, dbSaveCategory, dbDeleteCategory, 
   dbAddSubcategory, dbDeleteSubcategory,
   checkSupabaseHealth, SupabaseHealth,
-  dbSyncSeedProductsToSupabase
+  dbSyncSeedProductsToSupabase, dbSaveHomeContent
 } from '../lib/dbService';
 import AdminHomeEditor from './dashboard/AdminHomeEditor';
 
@@ -51,7 +52,12 @@ export default function AdminView({
   onOpenAuthModal,
 }: AdminViewProps) {
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'home'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'home' | 'pricerange' | 'manual'>('orders');
+
+  // Price range edit state
+  const [rangeMinPrice, setRangeMinPrice] = useState<number>(homeContent?.storeMinPrice || 20);
+  const [rangeMaxPrice, setRangeMaxPrice] = useState<number>(homeContent?.storeMaxPrice || 1000);
+  const [savingRange, setSavingRange] = useState(false);
 
   // Orders State
   const [globalOrders, setGlobalOrders] = useState<{ order: Order; userName: string; userEmail: string; userId: string }[]>([]);
@@ -643,6 +649,40 @@ export default function AdminView({
                 EDITOR
               </span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('pricerange')}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'pricerange'
+                  ? 'bg-black text-white shadow-md'
+                  : 'text-neutral-700 hover:bg-neutral-100'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Sliders className="w-4 h-4 stroke-[1.5]" />
+                <span>Rango de Precios de Tienda</span>
+              </div>
+              <span className="text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+                CONFIG
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('manual')}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'manual'
+                  ? 'bg-black text-white shadow-md'
+                  : 'text-neutral-700 hover:bg-neutral-100'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-4 h-4 stroke-[1.5]" />
+                <span>Manual & Tutorial de la Web</span>
+              </div>
+              <span className="text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 border border-blue-300">
+                GUÍA
+              </span>
+            </button>
           </div>
 
           {/* Right Main Content Area */}
@@ -996,27 +1036,31 @@ export default function AdminView({
                       </div>
 
                       <div>
-                        <label className="block text-neutral-700 font-semibold mb-1">Precio Actual / Oferta ($ USD)</label>
+                        <label className="block text-neutral-700 font-semibold mb-1">
+                          Precio SUNNSSHOP ($ USD) *
+                        </label>
                         <input
                           type="number"
                           step="0.01"
                           required
                           value={editingProduct.price}
                           onChange={e => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
-                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono"
+                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono font-bold"
                           placeholder="185.00"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-neutral-700 font-semibold mb-1">Precio Regular Anterior ($ USD - Opcional para Descuento)</label>
+                        <label className="block text-neutral-700 font-semibold mb-1">
+                          Precio Original ($ USD - Opcional para Descuento)
+                        </label>
                         <input
                           type="number"
                           step="0.01"
                           value={editingProduct.originalPrice || ''}
                           onChange={e => setEditingProduct({ ...editingProduct, originalPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
                           className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono placeholder:font-sans"
-                          placeholder="Ej: 250.00 (Muestra etiqueta de Descuento)"
+                          placeholder="Ej: 250.00 (Muestra precio tachado y % OFF)"
                         />
                       </div>
 
@@ -1044,27 +1088,129 @@ export default function AdminView({
                         />
                       </div>
 
-                      <div className="md:col-span-2">
-                        <label className="block text-neutral-700 font-semibold mb-1">
-                          Opciones de Cristal / Tipo de Lente (Separadas por comas)
-                        </label>
-                        <input
-                          type="text"
-                          value={(editingProduct.lensOptions || []).join(', ')}
-                          onChange={e => {
-                            const opts = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                            setEditingProduct({ ...editingProduct, lensOptions: opts });
-                          }}
-                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none"
-                          placeholder="Ej: Lente Solar Oscuro, Lente Óptico Transparente, Polarizado HD"
-                        />
-                        <p className="text-[10px] text-neutral-500 mt-1">
-                          Permite a los clientes elegir el cristal deseado dentro del mismo modelo de lentes.
-                        </p>
+                      {/* 2 Puntos de Descripción Editables */}
+                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3.5 border border-neutral-300 rounded-2xl">
+                        <div>
+                          <label className="block text-neutral-800 font-bold mb-1 text-[11px]">
+                            • Punto de Descripción 1
+                          </label>
+                          <input
+                            type="text"
+                            value={editingProduct.details?.[0] || ''}
+                            onChange={e => {
+                              const newDetails = [...(editingProduct.details || ['', ''])];
+                              newDetails[0] = e.target.value;
+                              setEditingProduct({ ...editingProduct, details: newDetails });
+                            }}
+                            className="w-full bg-neutral-50 border border-neutral-300 rounded-xl p-2 focus:border-black outline-none text-xs"
+                            placeholder="Ej: Montura ultra ligera con acabado en acetato italiano"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-neutral-800 font-bold mb-1 text-[11px]">
+                            • Punto de Descripción 2
+                          </label>
+                          <input
+                            type="text"
+                            value={editingProduct.details?.[1] || ''}
+                            onChange={e => {
+                              const newDetails = [...(editingProduct.details || ['', ''])];
+                              newDetails[1] = e.target.value;
+                              setEditingProduct({ ...editingProduct, details: newDetails });
+                            }}
+                            className="w-full bg-neutral-50 border border-neutral-300 rounded-xl p-2 focus:border-black outline-none text-xs"
+                            placeholder="Ej: Lentes polarizadas UV400 con recubrimiento hidrofóbico"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Configuración Avanzada de Variantes de Color con MÚLTIPLES FOTOS */}
+                      <div className="md:col-span-2 space-y-3 bg-white p-4 border border-neutral-300 rounded-2xl">
+                        <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                          <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                            Variantes de Color y Fotografías por Color
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentCols = editingProduct.colors || [];
+                              setEditingProduct({
+                                ...editingProduct,
+                                colors: [...currentCols, { name: 'Oro', value: '#D4AF37', images: [] }]
+                              });
+                            }}
+                            className="px-3 py-1 bg-black hover:bg-neutral-800 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer"
+                          >
+                            + Añadir Color
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(editingProduct.colors || []).map((col, cIdx) => (
+                            <div key={cIdx} className="bg-neutral-50 border border-neutral-200 p-3 rounded-xl space-y-2">
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={col.name}
+                                  onChange={e => {
+                                    const updated = [...(editingProduct.colors || [])];
+                                    updated[cIdx].name = e.target.value;
+                                    setEditingProduct({ ...editingProduct, colors: updated });
+                                  }}
+                                  placeholder="Nombre de Color (Ej. Oro Pulido)"
+                                  className="flex-1 bg-white border border-neutral-300 rounded-lg p-2 text-xs font-semibold"
+                                />
+                                <input
+                                  type="color"
+                                  value={col.value || '#1A1A1A'}
+                                  onChange={e => {
+                                    const updated = [...(editingProduct.colors || [])];
+                                    updated[cIdx].value = e.target.value;
+                                    setEditingProduct({ ...editingProduct, colors: updated });
+                                  }}
+                                  className="w-10 h-9 rounded-lg border border-neutral-300 cursor-pointer p-0.5"
+                                  title="Seleccionar Tono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = (editingProduct.colors || []).filter((_, idx) => idx !== cIdx);
+                                    setEditingProduct({ ...editingProduct, colors: updated });
+                                  }}
+                                  className="p-1.5 text-rose-600 hover:text-rose-800 cursor-pointer"
+                                  title="Eliminar este color"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-neutral-600 uppercase mb-1">
+                                  Fotografías para el Color "{col.name}" (1 URL por línea o separadas por comas):
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={(col.images || []).join('\n')}
+                                  onChange={e => {
+                                    const imgLines = e.target.value
+                                      .split(/[\n,]+/)
+                                      .map(s => s.trim())
+                                      .filter(Boolean);
+                                    const updated = [...(editingProduct.colors || [])];
+                                    updated[cIdx].images = imgLines;
+                                    setEditingProduct({ ...editingProduct, colors: updated });
+                                  }}
+                                  placeholder="Pega aquí los enlaces de las fotos pertenecientes a este color específico..."
+                                  className="w-full bg-white border border-neutral-300 rounded-lg p-2 text-[11px] font-mono leading-relaxed"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       <div>
-                        <label className="block text-neutral-700 font-semibold mb-1">URL de Imagen Principal</label>
+                        <label className="block text-neutral-700 font-semibold mb-1">URL de Imagen Principal General</label>
                         <input
                           type="url"
                           required
@@ -1096,7 +1242,7 @@ export default function AdminView({
 
                       <div className="md:col-span-2">
                         <label className="block text-neutral-700 font-semibold mb-1">
-                          Galería de Imágenes Adicionales (1 URL por línea o separadas por comas)
+                          Galería General de Imágenes del Producto
                         </label>
                         <textarea
                           rows={2}
@@ -1113,7 +1259,7 @@ export default function AdminView({
                             });
                           }}
                           className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px] leading-relaxed"
-                          placeholder="Pega aquí múltiples enlaces de imágenes de Postimages para que aparezcan en la galería..."
+                          placeholder="Pega aquí enlaces adicionales si no están asignados por color..."
                         />
                       </div>
 
@@ -1454,6 +1600,186 @@ export default function AdminView({
                 onUpdateContent={setHomeContent}
                 showToast={showToast}
               />
+            )}
+
+            {/* ==================================================== */}
+            {/* TAB 5: RANGO DE PRECIOS DE TIENDA                    */}
+            {/* ==================================================== */}
+            {activeTab === 'pricerange' && (
+              <div className="space-y-6">
+                <div className="border-b border-neutral-200 pb-4">
+                  <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-emerald-600" />
+                    Configuración del Rango de Precios de la Tienda
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Ajusta los límites mínimo y máximo del filtro deslizante de precios que ven los clientes en el catálogo de la Tienda.
+                  </p>
+                </div>
+
+                <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 space-y-1">
+                  <strong className="block text-emerald-950 font-bold">💡 Ubicación de la Configuración:</strong>
+                  <p>
+                    Puedes modificar los límites de precios en cualquier momento desde esta pestaña ("Rango de Precios de Tienda"). Los cambios se guardan en la base de datos y se actualizan al instante en el filtro de la página Tienda.
+                  </p>
+                </div>
+
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setSavingRange(true);
+                    const updatedContent: HomeContent = {
+                      ...homeContent,
+                      storeMinPrice: Number(rangeMinPrice),
+                      storeMaxPrice: Number(rangeMaxPrice),
+                    };
+                    const ok = await dbSaveHomeContent(updatedContent);
+                    if (ok) {
+                      setHomeContent(updatedContent);
+                      showToast('✓ Rango de precios guardado exitosamente');
+                    } else {
+                      showToast('⚠️ Error al guardar en base de datos');
+                    }
+                    setSavingRange(false);
+                  }}
+                  className="bg-neutral-50 border border-neutral-300 rounded-2xl p-6 space-y-5 shadow-xs max-w-2xl"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-neutral-800 font-bold text-xs mb-1.5">
+                        Precio Mínimo en Filtro ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5"
+                        required
+                        value={rangeMinPrice}
+                        onChange={(e) => setRangeMinPrice(Number(e.target.value))}
+                        className="w-full bg-white border border-neutral-300 rounded-xl p-3 text-sm font-mono font-bold text-neutral-900 focus:border-black outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-800 font-bold text-xs mb-1.5">
+                        Precio Máximo en Filtro ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        min="10"
+                        step="10"
+                        required
+                        value={rangeMaxPrice}
+                        onChange={(e) => setRangeMaxPrice(Number(e.target.value))}
+                        className="w-full bg-white border border-neutral-300 rounded-xl p-3 text-sm font-mono font-bold text-neutral-900 focus:border-black outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-neutral-200 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={savingRange}
+                      className="px-6 py-3 bg-black hover:bg-neutral-800 text-white font-bold uppercase tracking-wider text-xs rounded-xl transition-colors shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {savingRange ? 'Guardando en Base de Datos...' : 'Guardar Rango de Precios'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* ==================================================== */}
+            {/* TAB 6: MANUAL & TUTORIAL COMPLETO DE LA PÁGINA       */}
+            {/* ==================================================== */}
+            {activeTab === 'manual' && (
+              <div className="space-y-6">
+                <div className="border-b border-neutral-200 pb-4">
+                  <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-blue-600" />
+                    Manual de Uso & Tutorial Completo de la Página Web
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Guía detallada para administrar todos los aspectos de SUNNSSHOP: productos, precios, fotos por color, categorías y ventas.
+                  </p>
+                </div>
+
+                <div className="space-y-4 text-xs text-neutral-800 leading-relaxed">
+                  
+                  {/* Seccion 1 */}
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-2">
+                    <h4 className="font-bold text-sm text-black flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-mono">1</span>
+                      Añadir Nuevos Productos y Múltiples Fotos por Color
+                    </h4>
+                    <p className="text-neutral-600">
+                      Dirígete a la pestaña <strong>"Gestión de Productos"</strong> y haz clic en <strong>"+ Añadir Nuevo Producto"</strong>.
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 pl-2 text-neutral-700 font-medium">
+                      <li><strong>Precio SUNNSSHOP:</strong> Es el precio real al que se vende el producto en la tienda.</li>
+                      <li><strong>Precio Original:</strong> Es el precio regular sin descuento. Si lo llenas, en la tienda aparecerá tachado junto al porcentaje de descuento (ej: -20% OFF).</li>
+                      <li><strong>Puntos de Descripción 1 y 2:</strong> Escribe los 2 aspectos destacados de la montura (ej: "Acetato italiano pulido a mano" y "Protección UV400 completa").</li>
+                      <li><strong>Fotos por Variante de Color:</strong> En la sección "Variantes de Color", puedes agregar cada color con su tono y pegar múltiples URLs de imágenes pertenecientes exclusivamente a ese color. Al cambiar de color en la vista de producto, las fotos de la galería cambiarán automáticamente a las de ese color.</li>
+                    </ul>
+                  </div>
+
+                  {/* Seccion 2 */}
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-2">
+                    <h4 className="font-bold text-sm text-black flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-mono">2</span>
+                      Modificar el Rango de Precio de la Tienda
+                    </h4>
+                    <p className="text-neutral-600">
+                      El rango de precio que ven los clientes en el filtro de la página Tienda se edita directamente desde la pestaña <strong>"Rango de Precios de Tienda"</strong> ubicada en este menú lateral de administración.
+                    </p>
+                    <p className="text-neutral-600">
+                      Solo debes ingresar el monto mínimo (ej: $20 USD) y el monto máximo (ej: $1,000 USD) y presionar "Guardar Rango de Precios".
+                    </p>
+                  </div>
+
+                  {/* Seccion 3 */}
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-2">
+                    <h4 className="font-bold text-sm text-black flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-mono">3</span>
+                      Códigos de Descuento e Impuestos (7%)
+                    </h4>
+                    <p className="text-neutral-600">
+                      Durante el proceso de pago (Checkout) los clientes pueden escribir y activar códigos de descuento promocionales:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 pl-2 text-neutral-700 font-medium">
+                      <li><code className="bg-neutral-200 px-1.5 py-0.5 rounded font-mono">SUNNS10</code> o <code className="bg-neutral-200 px-1.5 py-0.5 rounded font-mono">BIENVENIDO</code>: Aplica un 10% de descuento.</li>
+                      <li><code className="bg-neutral-200 px-1.5 py-0.5 rounded font-mono">SUNNS20</code>: Aplica un 20% de descuento.</li>
+                      <li><code className="bg-neutral-200 px-1.5 py-0.5 rounded font-mono">VIP25</code>: Aplica un 25% de descuento.</li>
+                    </ul>
+                    <p className="text-neutral-600 mt-1">
+                      <strong>Cálculo de Impuestos:</strong> Antes de confirmar el pago, la plataforma aplica automáticamente el <strong>7% de impuestos</strong> sobre el subtotal final para cumplir con las regulaciones de venta.
+                    </p>
+                  </div>
+
+                  {/* Seccion 4 */}
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-2">
+                    <h4 className="font-bold text-sm text-black flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-mono">4</span>
+                      Gestión de Categorías y Subcategorías
+                    </h4>
+                    <p className="text-neutral-600">
+                      En la pestaña <strong>"Gestión de Categorías"</strong> puedes crear nuevas categorías (ej: "Prueba 3"). Las categorías creadas aparecen de inmediato tanto en los filtros de la Tienda como en la barra de navegación del sitio.
+                    </p>
+                  </div>
+
+                  {/* Seccion 5 */}
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-2">
+                    <h4 className="font-bold text-sm text-black flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-mono">5</span>
+                      Historial de Compras y Seguimiento de Envíos
+                    </h4>
+                    <p className="text-neutral-600">
+                      En <strong>"Historial de Compras"</strong> puedes ver todas las órdenes realizadas por los clientes, actualizar el estado de la compra (Pagado, Enviado, Entregado) e ingresar la empresa de transporte junto con la guía de seguimiento.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
             )}
 
           </div>

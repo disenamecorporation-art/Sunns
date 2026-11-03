@@ -6,22 +6,22 @@
 export interface ProductColor {
   name: string;
   value: string; // Tailwind color class or hex code
+  images?: string[]; // Múltiples fotos específicas para esta variante de color
 }
 
 export interface Product {
   id: string;
   name: string;
-  price: number;
-  originalPrice?: number; // Precio regular anterior / precio sin descuento
+  price: number; // Precio SUNNSSHOP (Precio de venta)
+  originalPrice?: number; // Precio Original (Precio regular de referencia / tachado)
   category: string;
   subcategory?: string;
   description: string;
-  details: string[];
-  image: string;
-  images: string[];
+  details: string[]; // Puntos de descripción (Punto 1 y Punto 2)
+  image: string; // Foto principal de portada
+  images: string[]; // Fotos generales adicionales
   videoUrl?: string; // URL opcional de video (MP4 o YouTube)
-  colors: ProductColor[];
-  lensOptions?: string[]; // Opciones de tipo de cristal/lente para el mismo modelo
+  colors: ProductColor[]; // Colores con fotos individuales por color
   inStock: boolean;
   featured: boolean;
   rating: number;

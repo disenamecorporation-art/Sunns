@@ -66,10 +66,45 @@ export default function CheckoutModal({
     }
   }, [currentUser, isOpen]);
 
+  // Discount coupon state
+  const [couponInput, setCouponInput] = useState('');
+  const [currentCoupon, setCurrentCoupon] = useState<Coupon | null>(activeCoupon || null);
+  const [couponFeedback, setCouponFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const VALID_COUPONS: Record<string, number> = {
+    'SUNNS10': 10,
+    'SUNNS15': 15,
+    'SUNNS20': 20,
+    'BIENVENIDO': 10,
+    'VIP25': 25,
+  };
+
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    if (VALID_COUPONS[code]) {
+      const percent = VALID_COUPONS[code];
+      setCurrentCoupon({ code, discountPercent: percent });
+      setCouponFeedback({ type: 'success', message: `¡Cupón ${code} aplicado con éxito! -${percent}% de descuento.` });
+    } else {
+      setCouponFeedback({ type: 'error', message: 'Código inválido o expirado. Prueba con SUNNS10, SUNNS20 o BIENVENIDO.' });
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCurrentCoupon(null);
+    setCouponInput('');
+    setCouponFeedback(null);
+  };
+
+  // Subtotal, Discount, 7% Tax, and Total
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-  const discount = activeCoupon ? (subtotal * activeCoupon.discountPercent) / 100 : 0;
+  const discount = currentCoupon ? (subtotal * currentCoupon.discountPercent) / 100 : 0;
+  const taxableAmount = Math.max(0, subtotal - discount);
+  const tax = taxableAmount * 0.07; // Impuestos del 7%
   const shipping = 0; // Free express shipping
-  const total = Math.max(0, subtotal - discount + shipping);
+  const total = taxableAmount + tax;
 
   // Luhn algorithm validator for real card numbers
   const isValidLuhn = (numStr: string): boolean => {
@@ -333,7 +368,7 @@ ${orderItemsText}
         subtotal,
         shippingCost: 0,
         discount: discount,
-        tax: 0,
+        tax: tax,
         total,
         trackingNumber: `FDX-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
         courier: 'FedEx Luxury Overnight',
@@ -439,27 +474,97 @@ ${orderItemsText}
                 
                 <form onSubmit={handleProcessCheckout} className="space-y-6">
                   
-                  {/* Cart quick summary badge */}
-                  <div className="bg-[#faf9f6] border border-[#efeae0] p-4 rounded-xl flex justify-between items-center text-xs">
-                    <div>
-                      <span className="text-[#1a120e]/50 font-light block">Estás comprando:</span>
-                      <strong className="text-[#1a120e] font-semibold">
-                        {cart.length} {cart.length === 1 ? 'artículo' : 'artículos'} en tu bolsa
-                      </strong>
-                      {activeCoupon && (
-                        <span className="inline-block mt-1 text-[10px] text-green-700 font-bold bg-green-50 border border-green-200 px-2 py-0.5 rounded">
-                          Cupón {activeCoupon.code} (-{activeCoupon.discountPercent}%)
-                        </span>
+                  {/* Cart quick summary badge & 7% Tax Breakdown */}
+                  <div className="bg-[#faf9f6] border border-[#efeae0] p-4 sm:p-5 rounded-2xl space-y-3 text-xs">
+                    <div className="flex justify-between items-center pb-2 border-b border-[#efeae0]/70">
+                      <div>
+                        <span className="text-[#1a120e]/60 font-semibold block">Resumen de Compra</span>
+                        <strong className="text-[#1a120e] font-bold text-sm">
+                          {cart.length} {cart.length === 1 ? 'artículo' : 'artículos'} en tu bolsa
+                        </strong>
+                      </div>
+                      <span className="text-xs text-green-700 font-semibold bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                        Envío Exprés Gratis
+                      </span>
+                    </div>
+
+                    {/* Interactive Discount Coupon Code Form */}
+                    <div className="pt-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#1a120e]/70 block mb-1.5">
+                        ¿Tienes un código de descuento?
+                      </label>
+                      {currentCoupon ? (
+                        <div className="flex items-center justify-between bg-green-50 border border-green-200 p-2.5 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-green-700" />
+                            <span className="font-bold text-xs text-green-900">
+                              CÓDIGO {currentCoupon.code} ACTIVO (-{currentCoupon.discountPercent}%)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveCoupon}
+                            className="text-[10px] font-semibold text-rose-600 hover:text-rose-800 uppercase tracking-wider cursor-pointer"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={couponInput}
+                              onChange={(e) => {
+                                setCouponInput(e.target.value);
+                                setCouponFeedback(null);
+                              }}
+                              placeholder="Ej: SUNNS10, SUNNS20, BIENVENIDO"
+                              className="flex-1 bg-white border border-[#efeae0] rounded-xl px-3 py-2 text-xs uppercase font-mono tracking-wider text-[#1a120e] placeholder:normal-case placeholder:font-sans focus:outline-none focus:border-black"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyCoupon}
+                              className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                            >
+                              Aplicar
+                            </button>
+                          </div>
+                          {couponFeedback && (
+                            <p className={`text-[11px] font-medium ${couponFeedback.type === 'success' ? 'text-green-700' : 'text-rose-600'}`}>
+                              {couponFeedback.message}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div className="text-right">
-                      <span className="text-[#1a120e]/50 font-light block">Total a pagar:</span>
-                      <strong className="text-sm font-bold text-[#1a120e]">${total.toFixed(2)} USD</strong>
-                      {activeCoupon && (
-                        <span className="text-[10px] text-green-700 block font-medium">
-                          Ahorras ${discount.toFixed(2)} USD
-                        </span>
+
+                    {/* Breakdown with 7% Tax */}
+                    <div className="space-y-1.5 pt-2 border-t border-[#efeae0]/70 text-xs text-[#1a120e]/70">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>${subtotal.toFixed(2)} USD</span>
+                      </div>
+                      {discount > 0 && (
+                        <div className="flex justify-between text-green-700 font-semibold">
+                          <span>Descuento aplicado ({currentCoupon?.discountPercent}%)</span>
+                          <span>-${discount.toFixed(2)} USD</span>
+                        </div>
                       )}
+                      <div className="flex justify-between">
+                        <span>Envío Express Asegurado</span>
+                        <span className="text-green-700 font-semibold">Gratis ($0.00 USD)</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-black">
+                        <span>Impuestos obligatorios (7%)</span>
+                        <span>${tax.toFixed(2)} USD</span>
+                      </div>
+                      <div className="flex justify-between text-base font-black text-black pt-2 border-t border-[#efeae0]">
+                        <span>Total Final a Pagar</span>
+                        <span className="text-lg font-serif-elegant font-black">
+                          ${total.toFixed(2)} USD
+                        </span>
+                      </div>
                     </div>
                   </div>
 

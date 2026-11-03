@@ -31,6 +31,7 @@ export default function ShopView({
   categories,
   homeContent,
 }: ShopViewProps) {
+  const minPriceLimit = homeContent?.storeMinPrice || 20;
   const maxPriceLimit = homeContent?.storeMaxPrice || 1000;
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,12 +49,12 @@ export default function ShopView({
       setSelectedCategories([initialCategory]);
       // Reset other filters
       setSearchQuery('');
-      setMaxPrice(250);
+      setMaxPrice(maxPriceLimit);
       setSelectedColors([]);
       setOnlyInStock(false);
       onClearInitialCategory(); // Clear it so it doesn't lock state
     }
-  }, [initialCategory, onClearInitialCategory]);
+  }, [initialCategory, onClearInitialCategory, maxPriceLimit]);
 
   const categoriesList = useMemo(() => {
     const names = categories.map((c) => c.name.trim()).filter(Boolean);
@@ -168,8 +169,8 @@ export default function ShopView({
         {/* Desktop Layout Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 items-start">
           
-          {/* SIDEBAR FILTERS (Desktop Only) */}
-          <aside className="hidden lg:block space-y-8 bg-white border border-[#efeae0] rounded-xl p-6 shadow-sm sticky top-28">
+          {/* SIDEBAR FILTERS (Desktop Only - Smooth Independent Scroll, Never Freezes) */}
+          <aside className="hidden lg:block space-y-8 bg-white border border-[#efeae0] rounded-2xl p-6 shadow-sm sticky top-28 max-h-[calc(100vh-8.5rem)] overflow-y-auto overscroll-contain pr-3 scrollbar-thin">
             <div className="flex items-center justify-between border-b border-[#faf9f6] pb-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-[#1a120e] flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-[#1a120e]" />
@@ -222,7 +223,7 @@ export default function ShopView({
               </div>
             </div>
 
-            {/* Price Slider Filter */}
+            {/* Price Slider Filter with Dynamic Range from Admin */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#1a120e]/60">
@@ -232,7 +233,7 @@ export default function ShopView({
               </div>
               <input
                 type="range"
-                min="20"
+                min={minPriceLimit}
                 max={maxPriceLimit}
                 step="10"
                 value={maxPrice}
@@ -240,7 +241,7 @@ export default function ShopView({
                 className="w-full h-1 bg-[#efeae0] rounded-lg appearance-none cursor-pointer accent-[#1a120e]"
               />
               <div className="flex justify-between text-[10px] text-[#1a120e]/40 font-medium">
-                <span>$20 USD</span>
+                <span>${minPriceLimit} USD</span>
                 <span>${maxPriceLimit} USD</span>
               </div>
             </div>
@@ -374,8 +375,8 @@ export default function ShopView({
                         onMouseEnter={() => setHoveredProduct(p.id)}
                         onMouseLeave={() => setHoveredProduct(null)}
                       >
-                        {/* Image Wrap */}
-                        <div className="relative aspect-square w-full bg-[#faf9f6] flex items-center justify-center p-2 sm:p-3 border-b border-[#efeae0] overflow-hidden">
+                        {/* Image Wrap - Larger, high definition container */}
+                        <div className="relative aspect-square w-full bg-[#faf9f6] flex items-center justify-center p-3 sm:p-6 border-b border-[#efeae0] overflow-hidden group-hover:bg-[#f6f2ea]/60 transition-colors">
                           {/* Stock out badge */}
                           {!p.inStock ? (
                             <div className="absolute top-4 left-4 z-10 bg-[#e05050] text-[#f5f0e6] text-[8px] tracking-[0.15em] uppercase font-bold px-2.5 py-1 rounded">
@@ -404,7 +405,7 @@ export default function ShopView({
                           {/* Image box */}
                           <div
                             onClick={() => onProductClick(p.id)}
-                            className="w-full h-full flex items-center justify-center cursor-pointer transition-all duration-500 transform group-hover:scale-104"
+                            className="w-full h-full flex items-center justify-center cursor-pointer transition-all duration-500 transform group-hover:scale-106"
                           >
                             <img
                               src={currentImage}
@@ -416,7 +417,7 @@ export default function ShopView({
                                   target.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
                                 }
                               }}
-                              className="max-h-[250px] sm:max-h-[270px] w-full h-auto object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.08)]"
+                              className="max-h-[260px] sm:max-h-[290px] w-full h-auto object-contain filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.09)]"
                             />
                           </div>
 
@@ -425,7 +426,7 @@ export default function ShopView({
                             <div className="absolute bottom-3 inset-x-3 translate-y-12 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-10">
                               <button
                                 onClick={() => onAddToCart(p, p.colors[0])}
-                                className="w-full bg-[#150d0a] hover:bg-black text-[#f5f0e6] hover:text-white text-[9px] tracking-widest font-bold uppercase py-2.5 transition-colors duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md rounded-lg"
+                                className="w-full bg-[#150d0a] hover:bg-black text-[#f5f0e6] hover:text-white text-[9px] tracking-widest font-bold uppercase py-2.5 transition-colors duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md rounded-xl"
                                 id={`shop-quick-add-${p.id}`}
                               >
                                 <ShoppingCart className="w-3 h-3" />
@@ -436,7 +437,7 @@ export default function ShopView({
                         </div>
 
                         {/* Text details */}
-                        <div className="p-4 flex flex-col flex-1 bg-white">
+                        <div className="p-4 sm:p-5 flex flex-col flex-1 bg-white">
                           <span className="text-[8px] tracking-widest text-[#1a120e] uppercase font-bold mb-1">
                             {p.category}
                           </span>
@@ -461,23 +462,27 @@ export default function ShopView({
                             <span className="text-xs text-[#1a120e]/50 font-semibold">({p.reviewsCount})</span>
                           </div>
 
-                          <div className="mt-auto flex items-baseline justify-between pt-2 border-t border-[#efeae0]/40 flex-wrap gap-1">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span 
-                                className="text-lg sm:text-xl font-serif-elegant text-black"
-                                style={{ fontWeight: 950 }}
-                              >
-                                ${p.price.toFixed(2)} USD
-                              </span>
-                              {p.originalPrice && p.originalPrice > p.price && (
-                                <span className="text-xs font-serif-elegant text-[#1a120e]/40 line-through">
-                                  ${p.originalPrice.toFixed(2)} USD
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[9px] font-bold text-[#1a120e]/60 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
-                              Explorar
+                          <div className="mt-auto pt-3 border-t border-[#efeae0]/50 space-y-1">
+                            <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold block">
+                              Precio SUNNSSHOP
                             </span>
+                            <div className="flex items-baseline justify-between flex-wrap gap-1">
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <span 
+                                  className="text-lg sm:text-xl font-serif-elegant text-black font-black"
+                                >
+                                  ${p.price.toFixed(2)} USD
+                                </span>
+                                {p.originalPrice && p.originalPrice > p.price && (
+                                  <span className="text-xs font-serif-elegant text-[#1a120e]/40 line-through">
+                                    ${p.originalPrice.toFixed(2)} USD
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[9px] font-bold text-[#1a120e]/60 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
+                                Ver Detalle
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </motion.div>

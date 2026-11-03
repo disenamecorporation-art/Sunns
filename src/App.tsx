@@ -136,11 +136,10 @@ export default function App() {
   };
 
   // Cart actions
-  const handleAddToCart = (product: Product, color: ProductColor, quantity = 1, selectedLens?: string) => {
-    const lens = selectedLens || product.lensOptions?.[0] || 'Lente Solar Oscuro';
+  const handleAddToCart = (product: Product, color: ProductColor, quantity = 1) => {
     setCart((prevCart) => {
       const existingIdx = prevCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor?.name === color?.name && (item.selectedLens || '') === lens
+        (item) => item.product.id === product.id && item.selectedColor?.name === color?.name
       );
 
       if (existingIdx > -1) {
@@ -148,15 +147,15 @@ export default function App() {
         updated[existingIdx].quantity += quantity;
         return updated;
       } else {
-        return [...prevCart, { product, selectedColor: color, quantity, selectedLens: lens }];
+        return [...prevCart, { product, selectedColor: color, quantity }];
       }
     });
 
-    showToast(`✓ "${product.name}" (${color?.name || 'Negro'} - ${lens}) añadido a tu bolsa`);
+    showToast(`✓ "${product.name}" (${color?.name || 'Negro'}) añadido a tu bolsa`);
   };
 
-  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1, selectedLens?: string) => {
-    handleAddToCart(product, color, quantity, selectedLens);
+  const handleBuyNow = (product: Product, color: ProductColor, quantity = 1) => {
+    handleAddToCart(product, color, quantity);
     setIsCartOpen(true);
   };
 
@@ -264,12 +263,6 @@ export default function App() {
               transition={{ duration: 0.3 }}
             >
               <Hero setView={setView} homeContent={homeContent} />
-              
-              <FeaturedCategories
-                setView={setView}
-                setSelectedCategory={setInitialCategory}
-                homeContent={homeContent}
-              />
 
               <NewArrivals
                 products={products}

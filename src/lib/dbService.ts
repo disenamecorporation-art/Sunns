@@ -263,7 +263,7 @@ export function normalizeProduct(raw: any): Product {
 
   const image = String(raw.image || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80');
 
-  // Parse colors defensively
+  // Parse colors defensively with individual images per color
   let rawColors = raw.colors;
   if (typeof rawColors === 'string') {
     try { rawColors = JSON.parse(rawColors); } catch { rawColors = []; }
@@ -272,30 +272,40 @@ export function normalizeProduct(raw: any): Product {
 
   const normalizedColors: ProductColor[] = rawColors.map((c: any) => {
     if (typeof c === 'string' && c.trim()) {
-      return { name: c.trim(), value: getColorHexByName(c) };
+      return { name: c.trim(), value: getColorHexByName(c), images: [] };
     }
     if (c && typeof c === 'object') {
       const name = String(c.name || c.label || 'Negro').trim();
       const value = String(c.value || c.hex || c.color || getColorHexByName(name)).trim();
-      return { name, value };
+      let colorImgs: string[] = [];
+      if (Array.isArray(c.images)) {
+        colorImgs = c.images.map((img: any) => String(img || '').trim()).filter(Boolean);
+      } else if (typeof c.images === 'string') {
+        try {
+          const parsed = JSON.parse(c.images);
+          if (Array.isArray(parsed)) colorImgs = parsed.map(s => String(s || '').trim()).filter(Boolean);
+        } catch {
+          colorImgs = c.images.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean);
+        }
+      }
+      return { name, value, images: colorImgs };
     }
-    return { name: 'Negro', value: '#1A1A1A' };
+    return { name: 'Negro', value: '#1A1A1A', images: [] };
   });
 
   if (normalizedColors.length === 0) {
-    normalizedColors.push({ name: 'Negro', value: '#1A1A1A' });
+    normalizedColors.push({ name: 'Negro', value: '#1A1A1A', images: [] });
   }
 
-  // Parse details defensively
+  // Parse details defensively (2 bullet points: Punto 1 y Punto 2)
   let rawDetails = raw.details;
   if (typeof rawDetails === 'string') {
     try { rawDetails = JSON.parse(rawDetails); } catch { rawDetails = [rawDetails]; }
   }
   if (!Array.isArray(rawDetails)) rawDetails = [];
-  const normalizedDetails = rawDetails.map(d => String(d || '')).filter(Boolean);
-  if (normalizedDetails.length === 0) {
-    normalizedDetails.push('Diseño artesanal italiano de alta durabilidad', 'Protección UV400 integral');
-  }
+  const normalizedDetails = rawDetails.map(d => String(d || '').trim()).filter(Boolean);
+  const detail1 = normalizedDetails[0] || 'Material de acetato italiano de alta densidad';
+  const detail2 = normalizedDetails[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas';
 
   // Parse images defensively
   let rawImages = raw.images;
@@ -303,7 +313,7 @@ export function normalizeProduct(raw: any): Product {
     try { rawImages = JSON.parse(rawImages); } catch { rawImages = [rawImages]; }
   }
   if (!Array.isArray(rawImages)) rawImages = [];
-  const normalizedImages = rawImages.map(img => String(img || '')).filter(Boolean);
+  const normalizedImages = rawImages.map(img => String(img || '').trim()).filter(Boolean);
   if (normalizedImages.length === 0) {
     normalizedImages.push(image);
   }
@@ -311,24 +321,9 @@ export function normalizeProduct(raw: any): Product {
   // Parse videoUrl
   const videoUrl = (raw.video_url || raw.videoUrl || '').trim() || undefined;
 
-  // Parse original price
+  // Parse original price and SUNNSSHOP price
   const rawOrig = raw.original_price ?? raw.originalPrice;
   const originalPrice = rawOrig && Number(rawOrig) > 0 ? Number(rawOrig) : undefined;
-
-  // Parse lens options
-  let rawLens = raw.lens_options ?? raw.lensOptions;
-  if (typeof rawLens === 'string') {
-    try {
-      rawLens = JSON.parse(rawLens);
-    } catch {
-      rawLens = rawLens.split(',').map((s: string) => s.trim()).filter(Boolean);
-    }
-  }
-  if (!Array.isArray(rawLens)) rawLens = [];
-  const normalizedLens = rawLens.map(l => String(l || '').trim()).filter(Boolean);
-  if (normalizedLens.length === 0) {
-    normalizedLens.push('Lente Solar Oscuro', 'Lente Óptico Transparente');
-  }
 
   return {
     id: String(raw.id || `prod_${Date.now()}`),
@@ -338,12 +333,11 @@ export function normalizeProduct(raw: any): Product {
     category: String(raw.category || 'Sol'),
     subcategory: raw.subcategory ? String(raw.subcategory) : undefined,
     description: String(raw.description || 'Lentes de sol artesanales de alta gama.'),
-    details: normalizedDetails,
+    details: [detail1, detail2],
     image,
     images: normalizedImages,
     videoUrl,
     colors: normalizedColors,
-    lensOptions: normalizedLens,
     inStock: Boolean(raw.in_stock ?? raw.inStock ?? true),
     featured: Boolean(raw.featured ?? false),
     rating: Number(raw.rating || 5.0),
@@ -395,7 +389,7 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
       images: product.images || [product.image],
       video_url: product.videoUrl || null,
       colors: product.colors || [],
-      lens_options: product.lensOptions || [],
+      lens_options: [],
       in_stock: product.inStock ?? true,
       featured: product.featured ?? false,
       rating: product.rating || 5.0,
@@ -835,32 +829,36 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
     cleanUser.tier = 'Black Elite' as any;
   }
   memActiveUser = cleanUser as User;
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('sunns_session_user', JSON.stringify(memActiveUser));
+    }
+  } catch {}
   return { success: true, user: memActiveUser };
 }
 
 export function dbGetActiveSession(): User | null {
-  if (!memActiveUser) {
-    // Default to Super Admin so admin never gets logged out or asked to log in again
-    memActiveUser = {
-      id: 'usr_admin_001',
-      email: 'sunnsshop@icloud.com',
-      name: 'Sunnsshop Admin',
-      phone: '+1 (786) 825-9355',
-      role: 'admin',
-      tier: 'Black Elite' as any,
-      memberSince: '2026',
-      totalSpent: 0,
-      loyaltyPoints: 50000,
-      addresses: [],
-      paymentMethods: [],
-      twoFactorEnabled: false,
-    };
-  }
-  return memActiveUser;
+  if (memActiveUser) return memActiveUser;
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem('sunns_session_user');
+      if (stored) {
+        memActiveUser = JSON.parse(stored);
+        return memActiveUser;
+      }
+    }
+  } catch {}
+  return null;
 }
 
 export function dbLogoutUser(): void {
   memActiveUser = null;
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('sunns_session_user');
+      localStorage.removeItem('sunns_session_user');
+    }
+  } catch {}
 }
 
 export async function dbUpdateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {
