@@ -147,21 +147,35 @@ export default function NewArrivals({
                     <span className="text-xs text-black/50 font-semibold">({p.reviewsCount})</span>
                   </div>
 
-                  <div className="mt-auto flex items-center justify-between pt-2 border-t border-[#efeae0]/50">
-                    <span 
-                      className="text-xl sm:text-2xl font-serif-elegant text-black"
-                      style={{ fontWeight: 950 }}
-                    >
-                      ${p.price.toFixed(2)} USD
-                    </span>
-                    <button
-                      onClick={() => onProductClick(p.id)}
-                      className="text-[10px] tracking-wider uppercase font-semibold text-black/60 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
-                      id={`detail-btn-${p.id}`}
-                    >
-                      Ver detalle
-                    </button>
-                  </div>
+                  {(() => {
+                    const effectiveOrig = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : Math.round(p.price * 1.35);
+                    return (
+                      <div className="mt-auto pt-2 border-t border-[#efeae0]/50 space-y-1">
+                        <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold block">
+                          Precio SUNNSSHOP
+                        </span>
+                        <div className="flex items-baseline justify-between flex-wrap gap-1">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span 
+                              className="text-xl sm:text-2xl font-serif-elegant text-black font-black"
+                            >
+                              ${p.price.toFixed(2)} USD
+                            </span>
+                            <span className="text-xs font-serif-elegant text-[#1a120e]/45 line-through">
+                              ${effectiveOrig.toFixed(2)} USD
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => onProductClick(p.id)}
+                            className="text-[10px] tracking-wider uppercase font-semibold text-black/60 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
+                            id={`detail-btn-${p.id}`}
+                          >
+                            Ver detalle
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );

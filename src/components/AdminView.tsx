@@ -18,7 +18,8 @@ import {
   dbDeleteProduct, dbSaveCategory, dbDeleteCategory, 
   dbAddSubcategory, dbDeleteSubcategory,
   checkSupabaseHealth, SupabaseHealth,
-  dbSyncSeedProductsToSupabase, dbSaveHomeContent
+  dbSyncSeedProductsToSupabase, dbSaveHomeContent,
+  normalizeProduct, getColorHexByName
 } from '../lib/dbService';
 import AdminHomeEditor from './dashboard/AdminHomeEditor';
 
@@ -208,14 +209,42 @@ export default function AdminView({
     }
 
     try {
-      await dbSaveProduct(editingProduct);
-      const existing = products.some(p => p.id === editingProduct.id);
+      // Gather all photos from colors and model gallery into unified images array
+      const colorImages = (editingProduct.colors || []).flatMap(c => c.images || []);
+      const allImages = Array.from(new Set([
+        editingProduct.image,
+        ...(editingProduct.images || []),
+        ...colorImages
+      ].filter(Boolean)));
+
+      const productToSave: Product = {
+        ...editingProduct,
+        name: editingProduct.name.trim(),
+        price: Number(editingProduct.price),
+        originalPrice: editingProduct.originalPrice && editingProduct.originalPrice > Number(editingProduct.price)
+          ? Number(editingProduct.originalPrice)
+          : Math.round(Number(editingProduct.price) * 1.35),
+        details: [
+          (editingProduct.details?.[0] || 'Material de acetato italiano de alta densidad').trim(),
+          (editingProduct.details?.[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas').trim()
+        ],
+        image: editingProduct.image || allImages[0] || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800',
+        images: allImages.length > 0 ? allImages : [editingProduct.image],
+        colors: (editingProduct.colors || []).map(c => ({
+          name: c.name.trim() || 'Negro',
+          value: c.value || getColorHexByName(c.name),
+          images: Array.isArray(c.images) ? c.images.filter(Boolean) : []
+        }))
+      };
+
+      const saved = await dbSaveProduct(productToSave);
+      const existing = products.some(p => p.id === saved.id);
       if (existing) {
-        setProducts(prev => prev.map(p => (p.id === editingProduct.id ? editingProduct : p)));
-        showToast(`Producto "${editingProduct.name}" actualizado exitosamente`);
+        setProducts(prev => prev.map(p => (p.id === saved.id ? saved : p)));
+        showToast(`Producto "${saved.name}" actualizado exitosamente`);
       } else {
-        setProducts(prev => [editingProduct, ...prev]);
-        showToast(`Nuevo producto "${editingProduct.name}" guardado exitosamente`);
+        setProducts(prev => [saved, ...prev]);
+        showToast(`Nuevo producto "${saved.name}" guardado exitosamente`);
       }
       setEditingProduct(null);
       setIsCreatingProduct(false);
@@ -880,13 +909,17 @@ export default function AdminView({
                         setEditingProduct({
                           id: `prod_${Date.now()}`,
                           name: '',
-                          price: 150,
+                          price: 185,
+                          originalPrice: 250,
                           category: categories[0]?.name || 'Sol',
-                          description: '',
-                          details: ['Material de alta densidad', 'Protección UV400'],
+                          description: 'Lentes de sol artesanales con montura balanceada y protección completa UV400.',
+                          details: ['Material de acetato italiano de alta densidad', 'Protección 100% UV400 y bisagras de precisión reforzadas'],
                           image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800',
-                          images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&q=80&w=800'],
-                          colors: ['Negro Mate', 'Carey'],
+                          images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800'],
+                          colors: [
+                            { name: 'Negro Carbón', value: '#1A1A1A', images: [] },
+                            { name: 'Oro Pulido', value: '#D4AF37', images: [] }
+                          ],
                           inStock: true,
                           featured: false,
                           rating: 5.0,
@@ -1184,12 +1217,91 @@ export default function AdminView({
                                 </button>
                               </div>
 
-                              <div>
-                                <label className="block text-[10px] font-bold text-neutral-600 uppercase mb-1">
-                                  Fotografías para el Color "{col.name}" (1 URL por línea o separadas por comas):
-                                </label>
+                              <div className="space-y-2 pt-1 border-t border-neutral-200">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-bold text-neutral-700 uppercase">
+                                    Fotos para el color "{col.name}" ({(col.images || []).length} fotos)
+                                  </label>
+                                </div>
+
+                                {/* Thumbnail previews for this color */}
+                                {(col.images || []).length > 0 && (
+                                  <div className="flex flex-wrap gap-2 p-1.5 bg-white rounded-lg border border-neutral-200">
+                                    {(col.images || []).map((cImg, cImgIdx) => (
+                                      <div key={cImgIdx} className="relative group w-14 h-14 bg-neutral-100 rounded border border-neutral-300 overflow-hidden">
+                                        <img
+                                          src={cImg}
+                                          alt={`${col.name} ${cImgIdx + 1}`}
+                                          referrerPolicy="no-referrer"
+                                          onError={e => {
+                                            e.currentTarget.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                                          }}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = [...(editingProduct.colors || [])];
+                                            updated[cIdx].images = (updated[cIdx].images || []).filter((_, idx) => idx !== cImgIdx);
+                                            setEditingProduct({ ...editingProduct, colors: updated });
+                                          }}
+                                          className="absolute top-0.5 right-0.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-xs"
+                                          title="Eliminar foto de este color"
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Single photo URL input for this color */}
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="url"
+                                    id={`add-col-img-${cIdx}`}
+                                    placeholder="Enlace de foto para este color..."
+                                    className="flex-1 bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:border-black outline-none"
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const input = e.currentTarget;
+                                        const val = input.value.trim();
+                                        if (val) {
+                                          const updated = [...(editingProduct.colors || [])];
+                                          const curImgs = updated[cIdx].images || [];
+                                          if (!curImgs.includes(val)) {
+                                            updated[cIdx].images = [...curImgs, val];
+                                            setEditingProduct({ ...editingProduct, colors: updated });
+                                          }
+                                          input.value = '';
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const input = document.getElementById(`add-col-img-${cIdx}`) as HTMLInputElement | null;
+                                      if (input && input.value.trim()) {
+                                        const val = input.value.trim();
+                                        const updated = [...(editingProduct.colors || [])];
+                                        const curImgs = updated[cIdx].images || [];
+                                        if (!curImgs.includes(val)) {
+                                          updated[cIdx].images = [...curImgs, val];
+                                          setEditingProduct({ ...editingProduct, colors: updated });
+                                        }
+                                        input.value = '';
+                                      }
+                                    }}
+                                    className="px-2.5 py-1.5 bg-neutral-800 hover:bg-black text-white rounded-lg text-[10px] font-semibold uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                                  >
+                                    + Añadir
+                                  </button>
+                                </div>
+
                                 <textarea
-                                  rows={2}
+                                  rows={1}
                                   value={(col.images || []).join('\n')}
                                   onChange={e => {
                                     const imgLines = e.target.value
@@ -1200,8 +1312,8 @@ export default function AdminView({
                                     updated[cIdx].images = imgLines;
                                     setEditingProduct({ ...editingProduct, colors: updated });
                                   }}
-                                  placeholder="Pega aquí los enlaces de las fotos pertenecientes a este color específico..."
-                                  className="w-full bg-white border border-neutral-300 rounded-lg p-2 text-[11px] font-mono leading-relaxed"
+                                  placeholder="O pega varios enlaces separados por saltos de línea..."
+                                  className="w-full bg-white border border-neutral-300 rounded-lg p-1.5 text-[10px] font-mono leading-relaxed"
                                 />
                               </div>
                             </div>
@@ -1240,27 +1352,127 @@ export default function AdminView({
                         />
                       </div>
 
-                      <div className="md:col-span-2">
-                        <label className="block text-neutral-700 font-semibold mb-1">
-                          Galería General de Imágenes del Producto
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={(editingProduct.images || []).join('\n')}
-                          onChange={e => {
-                            const lines = e.target.value
-                              .split(/[\n,]+/)
-                              .map(s => s.trim())
-                              .filter(Boolean);
-                            setEditingProduct({ 
-                              ...editingProduct, 
-                              image: lines[0] || editingProduct.image,
-                              images: lines.length > 0 ? lines : [editingProduct.image] 
-                            });
-                          }}
-                          className="w-full bg-white border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px] leading-relaxed"
-                          placeholder="Pega aquí enlaces adicionales si no están asignados por color..."
-                        />
+                      <div className="md:col-span-2 bg-white p-4 border border-neutral-300 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                          <div>
+                            <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider block">
+                              Galería General de Fotografías del Modelo ({(editingProduct.images || []).length} fotos)
+                            </label>
+                            <p className="text-[10px] text-neutral-500">
+                              Puedes añadir todas las fotos que desees. La primera foto será la principal del modelo.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Visual Thumbnail Strip with Delete Button */}
+                        {(editingProduct.images || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2.5 p-2 bg-neutral-50 rounded-xl border border-neutral-200">
+                            {(editingProduct.images || []).map((imgUrl, imgIdx) => (
+                              <div key={imgIdx} className="relative group w-20 h-20 bg-white rounded-lg border border-neutral-300 overflow-hidden shadow-xs">
+                                <img
+                                  src={imgUrl}
+                                  alt={`Foto ${imgIdx + 1}`}
+                                  referrerPolicy="no-referrer"
+                                  onError={e => {
+                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+                                  }}
+                                  className="w-full h-full object-cover"
+                                />
+                                <span className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[9px] font-mono px-1 rounded">
+                                  #{imgIdx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const filtered = (editingProduct.images || []).filter((_, idx) => idx !== imgIdx);
+                                    setEditingProduct({
+                                      ...editingProduct,
+                                      image: filtered[0] || editingProduct.image,
+                                      images: filtered.length > 0 ? filtered : [editingProduct.image]
+                                    });
+                                  }}
+                                  className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm"
+                                  title="Eliminar esta foto"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add Single Image URL Input */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="url"
+                            id="add-single-model-img-input"
+                            placeholder="Pega el enlace directo de una foto (ej. https://i.postimg.cc/...)"
+                            className="flex-1 bg-neutral-50 border border-neutral-300 rounded-xl px-3 py-2 text-xs font-mono focus:border-black outline-none"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const val = input.value.trim();
+                                if (val) {
+                                  const current = editingProduct.images || [];
+                                  if (!current.includes(val)) {
+                                    setEditingProduct({
+                                      ...editingProduct,
+                                      image: current[0] || val,
+                                      images: [...current, val]
+                                    });
+                                  }
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById('add-single-model-img-input') as HTMLInputElement | null;
+                              if (input && input.value.trim()) {
+                                const val = input.value.trim();
+                                const current = editingProduct.images || [];
+                                if (!current.includes(val)) {
+                                  setEditingProduct({
+                                    ...editingProduct,
+                                    image: current[0] || val,
+                                    images: [...current, val]
+                                  });
+                                }
+                                input.value = '';
+                              }
+                            }}
+                            className="px-3.5 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                          >
+                            + Añadir Foto
+                          </button>
+                        </div>
+
+                        {/* Bulk Multi-Line Paste */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-600 uppercase mb-1">
+                            O pega múltiples enlaces a la vez (1 enlace por línea):
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={(editingProduct.images || []).join('\n')}
+                            onChange={e => {
+                              const lines = e.target.value
+                                .split(/[\n,]+/)
+                                .map(s => s.trim())
+                                .filter(Boolean);
+                              setEditingProduct({ 
+                                ...editingProduct, 
+                                image: lines[0] || editingProduct.image,
+                                images: lines.length > 0 ? lines : [editingProduct.image] 
+                              });
+                            }}
+                            className="w-full bg-neutral-50 border border-neutral-300 rounded-xl p-2.5 focus:border-black outline-none font-mono text-[11px] leading-relaxed"
+                            placeholder="https://...\nhttps://..."
+                          />
+                        </div>
                       </div>
 
                       <div className="md:col-span-2">
@@ -1391,7 +1603,20 @@ export default function AdminView({
                           <>
                             <button
                               onClick={() => {
-                                setEditingProduct({ ...product });
+                                const norm = normalizeProduct(product);
+                                setEditingProduct({
+                                  ...norm,
+                                  details: [
+                                    norm.details?.[0] || 'Material de acetato italiano de alta densidad',
+                                    norm.details?.[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas'
+                                  ],
+                                  images: norm.images && norm.images.length > 0 ? [...norm.images] : [norm.image],
+                                  colors: (norm.colors || []).map(c => ({
+                                    name: c.name,
+                                    value: c.value,
+                                    images: Array.isArray(c.images) ? [...c.images] : []
+                                  }))
+                                });
                                 setIsCreatingProduct(false);
                                 window.scrollTo({ top: 300, behavior: 'smooth' });
                               }}

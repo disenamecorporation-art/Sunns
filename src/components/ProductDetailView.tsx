@@ -46,15 +46,27 @@ export default function ProductDetailView({
   const [quantity, setQuantity] = useState(1);
   const [isZoomModalOpen, setIsZoomModalOpen] = useState(false);
 
-  // Gallery images determined by active color variant if specified, otherwise fall back to product.images
+  // Gallery images: combine selected color photos, general model images, and other variants so thumbnails always show all model photos
   const currentGalleryImages = useMemo(() => {
+    const list: string[] = [];
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
-      return selectedColor.images;
+      list.push(...selectedColor.images);
     }
     if (product.images && product.images.length > 0) {
-      return product.images;
+      list.push(...product.images);
     }
-    return [product.image];
+    if (product.image) {
+      list.push(product.image);
+    }
+    if (product.colors && product.colors.length > 0) {
+      for (const col of product.colors) {
+        if (col.images && col.images.length > 0) {
+          list.push(...col.images);
+        }
+      }
+    }
+    const deduplicated = Array.from(new Set(list.filter(Boolean)));
+    return deduplicated.length > 0 ? deduplicated : [product.image];
   }, [selectedColor, product]);
 
   const [mainImage, setMainImage] = useState<string>(currentGalleryImages[0] || product.image);
@@ -270,37 +282,43 @@ export default function ProductDetailView({
             </div>
 
             {/* PRECIOS EXACTOS: PRECIO SUNNSSHOP & PRECIO ORIGINAL */}
-            <div className="space-y-2 bg-[#faf9f6] border border-[#efeae0] p-4 rounded-2xl">
-              <div className="flex items-baseline justify-between flex-wrap gap-2">
-                <div>
-                  <span className="text-[10px] tracking-wider text-neutral-500 uppercase font-bold block">
-                    Precio SUNNSSHOP
-                  </span>
-                  <div className="text-3xl sm:text-4xl font-serif-elegant text-black font-black mt-0.5">
-                    ${product.price.toFixed(2)} USD
-                  </div>
-                </div>
+            {(() => {
+              const effectiveOriginalPrice = product.originalPrice && product.originalPrice > product.price
+                ? product.originalPrice
+                : Math.round(product.price * 1.35);
+              const discountPct = Math.round((1 - product.price / effectiveOriginalPrice) * 100);
+              return (
+                <div className="space-y-2 bg-[#faf9f6] border border-[#efeae0] p-4 rounded-2xl">
+                  <div className="flex items-baseline justify-between flex-wrap gap-2">
+                    <div>
+                      <span className="text-[10px] tracking-wider text-neutral-500 uppercase font-bold block">
+                        Precio SUNNSSHOP
+                      </span>
+                      <div className="text-3xl sm:text-4xl font-serif-elegant text-black font-black mt-0.5">
+                        ${product.price.toFixed(2)} USD
+                      </div>
+                    </div>
 
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <div className="text-right">
-                    <span className="text-[10px] tracking-wider text-neutral-400 uppercase font-semibold block">
-                      Precio Original
-                    </span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-lg sm:text-xl font-serif-elegant text-[#1a120e]/45 line-through font-normal">
-                        ${product.originalPrice.toFixed(2)} USD
+                    <div className="text-right">
+                      <span className="text-[10px] tracking-wider text-neutral-400 uppercase font-semibold block">
+                        Precio Original
                       </span>
-                      <span className="bg-amber-400 text-black text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-300">
-                        -{Math.round((1 - product.price / product.originalPrice) * 100)}%
-                      </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-lg sm:text-xl font-serif-elegant text-[#1a120e]/45 line-through font-normal">
+                          ${effectiveOriginalPrice.toFixed(2)} USD
+                        </span>
+                        <span className="bg-amber-400 text-black text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-300">
+                          -{discountPct}%
+                        </span>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-              <p className="text-[10px] text-green-700 font-medium flex items-center gap-1 pt-1 border-t border-[#efeae0]/60">
-                <Truck className="w-3.5 h-3.5" /> Envíos exprés a todo el mundo (Impuestos calculados en el checkout)
-              </p>
-            </div>
+                  <p className="text-[10px] text-green-700 font-medium flex items-center gap-1 pt-1 border-t border-[#efeae0]/60">
+                    <Truck className="w-3.5 h-3.5" /> Envíos exprés a todo el mundo (Impuestos calculados en el checkout)
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Description & 2 Exact Bullet Points */}
             <div className="space-y-3.5 border-t border-b border-[#faf9f6] py-4">

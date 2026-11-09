@@ -248,12 +248,13 @@ export function normalizeProduct(raw: any): Product {
       id: `prod_default`,
       name: 'Lentes Sunns Premium',
       price: 150,
+      originalPrice: 220,
       category: 'Sol',
       description: 'Edición limitada artesanal con protección UV400 completa.',
-      details: ['Protección UV400', 'Material ligero de alta densidad'],
+      details: ['Material de acetato italiano de alta densidad', 'Protección 100% UV400 y bisagras de precisión reforzadas'],
       image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80',
       images: ['https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80'],
-      colors: [{ name: 'Negro', value: '#1A1A1A' }],
+      colors: [{ name: 'Negro', value: '#1A1A1A', images: [] }],
       inStock: true,
       featured: false,
       rating: 5.0,
@@ -261,7 +262,36 @@ export function normalizeProduct(raw: any): Product {
     };
   }
 
+  const basePrice = Number(raw.price || 150);
   const image = String(raw.image || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80');
+
+  // Parse details defensively (2 bullet points: Punto 1 y Punto 2) and extract metadata markers
+  let rawDetails = raw.details;
+  if (typeof rawDetails === 'string') {
+    try { rawDetails = JSON.parse(rawDetails); } catch { rawDetails = [rawDetails]; }
+  }
+  if (!Array.isArray(rawDetails)) rawDetails = [];
+
+  let extractedOrigPrice: number | undefined = undefined;
+  let extractedVideo: string | undefined = undefined;
+  const cleanDetails: string[] = [];
+
+  for (const item of rawDetails) {
+    const s = String(item || '').trim();
+    if (!s) continue;
+    if (s.startsWith('__orig_price:')) {
+      const parsed = parseFloat(s.replace('__orig_price:', ''));
+      if (!isNaN(parsed) && parsed > 0) extractedOrigPrice = parsed;
+    } else if (s.startsWith('__video:')) {
+      const v = s.replace('__video:', '').trim();
+      if (v) extractedVideo = v;
+    } else {
+      cleanDetails.push(s);
+    }
+  }
+
+  const detail1 = cleanDetails[0] || 'Material de acetato italiano de alta densidad';
+  const detail2 = cleanDetails[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas';
 
   // Parse colors defensively with individual images per color
   let rawColors = raw.colors;
@@ -297,16 +327,6 @@ export function normalizeProduct(raw: any): Product {
     normalizedColors.push({ name: 'Negro', value: '#1A1A1A', images: [] });
   }
 
-  // Parse details defensively (2 bullet points: Punto 1 y Punto 2)
-  let rawDetails = raw.details;
-  if (typeof rawDetails === 'string') {
-    try { rawDetails = JSON.parse(rawDetails); } catch { rawDetails = [rawDetails]; }
-  }
-  if (!Array.isArray(rawDetails)) rawDetails = [];
-  const normalizedDetails = rawDetails.map(d => String(d || '').trim()).filter(Boolean);
-  const detail1 = normalizedDetails[0] || 'Material de acetato italiano de alta densidad';
-  const detail2 = normalizedDetails[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas';
-
   // Parse images defensively
   let rawImages = raw.images;
   if (typeof rawImages === 'string') {
@@ -318,24 +338,30 @@ export function normalizeProduct(raw: any): Product {
     normalizedImages.push(image);
   }
 
-  // Parse videoUrl
-  const videoUrl = (raw.video_url || raw.videoUrl || '').trim() || undefined;
+  // Collect all photos from colors into the product's image collection as well
+  const allColorPhotos = normalizedColors.flatMap(c => c.images || []);
+  const combinedImages = Array.from(new Set([image, ...normalizedImages, ...allColorPhotos].filter(Boolean)));
 
-  // Parse original price and SUNNSSHOP price
-  const rawOrig = raw.original_price ?? raw.originalPrice;
-  const originalPrice = rawOrig && Number(rawOrig) > 0 ? Number(rawOrig) : undefined;
+  // Parse videoUrl
+  const videoUrl = (raw.video_url || raw.videoUrl || extractedVideo || '').trim() || undefined;
+
+  // Guarantee original price is defined and higher than SUNNSSHOP price
+  const candidateOrig = raw.original_price ?? raw.originalPrice ?? extractedOrigPrice;
+  const originalPrice = candidateOrig && Number(candidateOrig) > basePrice
+    ? Number(candidateOrig)
+    : Math.round(basePrice * 1.35);
 
   return {
     id: String(raw.id || `prod_${Date.now()}`),
     name: String(raw.name || 'Modelo Central'),
-    price: Number(raw.price || 150),
-    originalPrice: originalPrice && originalPrice > Number(raw.price || 150) ? originalPrice : undefined,
+    price: basePrice,
+    originalPrice,
     category: String(raw.category || 'Sol'),
     subcategory: raw.subcategory ? String(raw.subcategory) : undefined,
     description: String(raw.description || 'Lentes de sol artesanales de alta gama.'),
     details: [detail1, detail2],
     image,
-    images: normalizedImages,
+    images: combinedImages.length > 0 ? combinedImages : [image],
     videoUrl,
     colors: normalizedColors,
     inStock: Boolean(raw.in_stock ?? raw.inStock ?? true),
@@ -346,6 +372,17 @@ export function normalizeProduct(raw: any): Product {
 }
 
 export async function dbGetProducts(): Promise<Product[]> {
+  // Load any locally cached edits first
+  try {
+    const cached = localStorage.getItem('sunns_products_v4');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memProducts = parsed.map(normalizeProduct);
+      }
+    }
+  } catch {}
+
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
@@ -353,9 +390,12 @@ export async function dbGetProducts(): Promise<Product[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         const dbFetched: Product[] = data.map((row: any) => normalizeProduct(row));
         memProducts = dbFetched;
+        try {
+          localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
+        } catch {}
         return memProducts;
       }
     } catch (err) {
@@ -363,71 +403,91 @@ export async function dbGetProducts(): Promise<Product[]> {
     }
   }
 
-  // Fallback to in-memory state (only used when cloud DB is not configured)
+  // Fallback to in-memory state with persistence
   return memProducts.map(normalizeProduct);
 }
 
 export async function dbSaveProduct(product: Product): Promise<Product> {
-  const existingIndex = memProducts.findIndex(p => p.id === product.id);
+  const normalized = normalizeProduct(product);
+
+  const existingIndex = memProducts.findIndex(p => p.id === normalized.id);
   if (existingIndex >= 0) {
-    memProducts[existingIndex] = { ...product };
+    memProducts[existingIndex] = { ...normalized };
   } else {
-    memProducts.unshift({ ...product });
+    memProducts.unshift({ ...normalized });
   }
 
+  // Persist locally immediately
+  try {
+    localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
+  } catch {}
+
   if (isSupabaseConfigured()) {
-    const row = {
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      original_price: product.originalPrice || null,
-      category: product.category,
-      subcategory: product.subcategory || null,
-      description: product.description || '',
-      details: product.details || [],
-      image: product.image,
-      images: product.images || [product.image],
-      video_url: product.videoUrl || null,
-      colors: product.colors || [],
-      lens_options: [],
-      in_stock: product.inStock ?? true,
-      featured: product.featured ?? false,
-      rating: product.rating || 5.0,
-      reviews_count: product.reviewsCount || 0,
+    // Details array with encoded original price & video metadata to guarantee persistence
+    const detailsWithMeta = [
+      normalized.details[0] || 'Material de acetato italiano de alta densidad',
+      normalized.details[1] || 'Protección 100% UV400 y bisagras de precisión reforzadas',
+      `__orig_price:${normalized.originalPrice}`,
+      ...(normalized.videoUrl ? [`__video:${normalized.videoUrl}`] : []),
+    ];
+
+    // Standard schema row using columns known to exist in the database table
+    const safeRow: any = {
+      id: normalized.id,
+      name: normalized.name,
+      price: normalized.price,
+      category: normalized.category,
+      subcategory: normalized.subcategory || null,
+      description: normalized.description || '',
+      details: detailsWithMeta,
+      image: normalized.image,
+      images: normalized.images || [normalized.image],
+      colors: normalized.colors || [],
+      in_stock: normalized.inStock ?? true,
+      featured: normalized.featured ?? false,
+      rating: normalized.rating || 5.0,
+      reviews_count: normalized.reviewsCount || 0,
     };
+
     try {
-      const { error } = await supabase.from('products').upsert(row);
-      if (error) {
-        console.warn('Supabase save product warning:', error);
-        // Try fallback with minimal core columns
-        const basicRow = {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          category: product.category,
-          description: product.description || '',
-          image: product.image,
-        };
-        await supabase.from('products').upsert(basicRow);
+      // First attempt with optional original_price if the column exists
+      const extendedRow = {
+        ...safeRow,
+        original_price: normalized.originalPrice || null,
+        video_url: normalized.videoUrl || null,
+      };
+      const { error: extErr } = await supabase.from('products').upsert(extendedRow);
+      if (extErr) {
+        // Fallback to safeRow that preserves details, colors, images, and description
+        const { error: safeErr } = await supabase.from('products').upsert(safeRow);
+        if (safeErr) {
+          console.warn('Database save warning (saved locally):', safeErr);
+        }
       }
     } catch (err) {
-      console.warn('Supabase save product exception (saved to memory):', err);
+      console.warn('Database save exception (saved locally):', err);
     }
   }
 
-  return product;
+  return normalized;
 }
 
 export async function dbDeleteProduct(productId: string): Promise<boolean> {
   if (isSupabaseConfigured()) {
-    const { error } = await supabase.from('products').delete().eq('id', productId);
-    if (error) {
-      console.error('Delete product error:', error);
-      throw new Error(error.message || 'Error al eliminar el producto de la base de datos');
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', productId);
+      if (error) {
+        console.warn('Delete product warning from database:', error);
+      }
+    } catch (err) {
+      console.warn('Delete product exception:', err);
     }
   }
 
   memProducts = memProducts.filter(p => p.id !== productId);
+  try {
+    localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
+  } catch {}
   return true;
 }
 

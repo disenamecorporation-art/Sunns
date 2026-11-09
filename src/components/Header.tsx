@@ -70,7 +70,7 @@ export default function Header({
     { label: 'Inicio', view: 'home', action: () => setView('home') },
     { label: 'Tienda', view: 'shop', action: () => setView('shop') },
     { label: 'Novedades', view: 'home', action: () => { setView('home'); setTimeout(() => scrollToSection('new-arrivals'), 100); } },
-    { label: 'Colecciones', view: 'home', action: () => { setView('home'); setTimeout(() => scrollToSection('collections'), 100); } },
+    { label: 'Colecciones', view: 'shop', action: () => { setView('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
     { label: 'Nosotros', view: 'home', action: () => { setView('home'); setTimeout(() => scrollToSection('about'), 100); } },
   ];
 

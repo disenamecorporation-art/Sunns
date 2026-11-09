@@ -377,16 +377,16 @@ export default function ShopView({
                       >
                         {/* Image Wrap - Larger, high definition container */}
                         <div className="relative aspect-square w-full bg-[#faf9f6] flex items-center justify-center p-3 sm:p-6 border-b border-[#efeae0] overflow-hidden group-hover:bg-[#f6f2ea]/60 transition-colors">
-                          {/* Stock out badge */}
+                          {/* Stock out or discount badge */}
                           {!p.inStock ? (
                             <div className="absolute top-4 left-4 z-10 bg-[#e05050] text-[#f5f0e6] text-[8px] tracking-[0.15em] uppercase font-bold px-2.5 py-1 rounded">
                               Agotado
                             </div>
-                          ) : p.originalPrice && p.originalPrice > p.price ? (
+                          ) : (
                             <div className="absolute top-4 left-4 z-10 bg-amber-400 text-black text-[8px] tracking-wider uppercase font-black px-2.5 py-1 rounded-full border border-amber-300 shadow-sm">
-                              -{Math.round((1 - p.price / p.originalPrice) * 100)}%
+                              -{Math.round((1 - p.price / (p.originalPrice && p.originalPrice > p.price ? p.originalPrice : Math.round(p.price * 1.35))) * 100)}%
                             </div>
-                          ) : null}
+                          )}
 
                           {/* Favorite Button */}
                           <button
@@ -462,28 +462,32 @@ export default function ShopView({
                             <span className="text-xs text-[#1a120e]/50 font-semibold">({p.reviewsCount})</span>
                           </div>
 
-                          <div className="mt-auto pt-3 border-t border-[#efeae0]/50 space-y-1">
-                            <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold block">
-                              Precio SUNNSSHOP
-                            </span>
-                            <div className="flex items-baseline justify-between flex-wrap gap-1">
-                              <div className="flex items-baseline gap-2 flex-wrap">
-                                <span 
-                                  className="text-lg sm:text-xl font-serif-elegant text-black font-black"
-                                >
-                                  ${p.price.toFixed(2)} USD
+                          {/* Prices container */}
+                          {(() => {
+                            const effectiveOrig = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : Math.round(p.price * 1.35);
+                            return (
+                              <div className="mt-auto pt-3 border-t border-[#efeae0]/50 space-y-1">
+                                <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold block">
+                                  Precio SUNNSSHOP
                                 </span>
-                                {p.originalPrice && p.originalPrice > p.price && (
-                                  <span className="text-xs font-serif-elegant text-[#1a120e]/40 line-through">
-                                    ${p.originalPrice.toFixed(2)} USD
+                                <div className="flex items-baseline justify-between flex-wrap gap-1">
+                                  <div className="flex items-baseline gap-2 flex-wrap">
+                                    <span 
+                                      className="text-lg sm:text-xl font-serif-elegant text-black font-black"
+                                    >
+                                      ${p.price.toFixed(2)} USD
+                                    </span>
+                                    <span className="text-xs font-serif-elegant text-[#1a120e]/45 line-through">
+                                      ${effectiveOrig.toFixed(2)} USD
+                                    </span>
+                                  </div>
+                                  <span className="text-[9px] font-bold text-[#1a120e]/60 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
+                                    Ver Detalle
                                   </span>
-                                )}
+                                </div>
                               </div>
-                              <span className="text-[9px] font-bold text-[#1a120e]/60 group-hover:text-black transition-colors uppercase tracking-wider flex items-center gap-0.5">
-                                Ver Detalle
-                              </span>
-                            </div>
-                          </div>
+                            );
+                          })()}
                         </div>
                       </motion.div>
                     );
