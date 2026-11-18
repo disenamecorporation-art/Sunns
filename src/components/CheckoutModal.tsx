@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, ShieldCheck, ShoppingBag, Truck, ChevronRight, 
   CreditCard, CheckCircle2, Lock, Sparkles, MessageSquare 
@@ -11,6 +11,43 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { CartItem, User, Order, OrderItem, Coupon } from '../types';
 import { saveUserOrder } from '../lib/userService';
+
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID || '';
+const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID || '';
+
+const loadSquareSdk = (appId: string): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && (window as any).Square) {
+      resolve((window as any).Square);
+      return;
+    }
+
+    const isSandbox = appId.startsWith('sandbox-');
+    const sdkUrl = isSandbox
+      ? 'https://sandbox.web.squareup.com/v1/square.js'
+      : 'https://web.squareup.com/v1/square.js';
+
+    const existingScript = document.querySelector(`script[src="${sdkUrl}"]`) as HTMLScriptElement | null;
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve((window as any).Square));
+      existingScript.addEventListener('error', () => reject(new Error('No se pudo cargar el SDK de Square.')));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = sdkUrl;
+    script.async = true;
+    script.onload = () => {
+      if ((window as any).Square) {
+        resolve((window as any).Square);
+      } else {
+        reject(new Error('Square SDK cargado pero no inicializado.'));
+      }
+    };
+    script.onerror = () => reject(new Error('No se pudo cargar el formulario seguro de Square.'));
+    document.head.appendChild(script);
+  });
+};
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -41,10 +78,9 @@ export default function CheckoutModal({
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('Estados Unidos');
 
-  // Square card state
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
+  // Square Web Payments SDK state
+  const cardRef = useRef<any>(null);
+  const [isCardReady, setIsCardReady] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -106,55 +142,96 @@ export default function CheckoutModal({
   const shipping = 0; // Free express shipping
   const total = taxableAmount + tax;
 
-  // Luhn algorithm validator for real card numbers
-  const isValidLuhn = (numStr: string): boolean => {
-    const clean = numStr.replace(/\D/g, '');
-    if (clean.length < 13 || clean.length > 19) return false;
-    let sum = 0;
-    let shouldDouble = false;
-    for (let i = clean.length - 1; i >= 0; i--) {
-      let digit = parseInt(clean.charAt(i), 10);
-      if (shouldDouble) {
-        digit *= 2;
-        if (digit > 9) digit -= 9;
-      }
-      sum += digit;
-      shouldDouble = !shouldDouble;
+  // Initialize Square Web Payments Card form when modal opens with Square selected
+  useEffect(() => {
+    if (!isOpen || paymentMethod !== 'square' || orderCompleted) {
+      return;
     }
-    return sum % 10 === 0;
-  };
 
-  // Expiration date validator
-  const isValidExpDate = (expStr: string): { valid: boolean; message?: string } => {
-    const clean = expStr.replace(/\s+/g, '');
-    const match = clean.match(/^(\d{1,2})\/(\d{2}|\d{4})$/);
-    if (!match) {
-      return { valid: false, message: 'Formato de fecha inválido (debe ser MM/AA)' };
-    }
-    const month = parseInt(match[1], 10);
-    let year = parseInt(match[2], 10);
-    if (year < 100) year += 2000;
-    if (month < 1 || month > 12) {
-      return { valid: false, message: 'El mes debe estar entre 01 y 12' };
-    }
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      return { valid: false, message: 'La tarjeta está vencida / expirada' };
-    }
-    if (year > currentYear + 20) {
-      return { valid: false, message: 'Año de expiración inválido' };
-    }
-    return { valid: true };
-  };
+    let cancelled = false;
+    let mountedCard: any = null;
+
+    const initSquareCard = async () => {
+      setIsCardReady(false);
+      setCardError(null);
+
+      if (!SQUARE_APP_ID || !SQUARE_LOCATION_ID) {
+        setCardError(
+          'Faltan configurar VITE_SQUARE_APPLICATION_ID y VITE_SQUARE_LOCATION_ID en las variables de entorno de Netlify.'
+        );
+        return;
+      }
+
+      try {
+        const SquareSDK = await loadSquareSdk(SQUARE_APP_ID);
+        if (cancelled) return;
+
+        const container = document.getElementById('square-card-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const payments = SquareSDK.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+        const card = await payments.card({
+          style: {
+            '.input-container': {
+              borderColor: '#efeae0',
+              borderRadius: '8px',
+            },
+            '.input-container.is-focus': {
+              borderColor: '#1a120e',
+            },
+            input: {
+              backgroundColor: '#ffffff',
+              color: '#1a120e',
+              fontSize: '13px',
+            },
+          },
+        });
+
+        if (cancelled) {
+          await card.destroy().catch(() => {});
+          return;
+        }
+
+        await card.attach('#square-card-container');
+        if (cancelled) {
+          await card.destroy().catch(() => {});
+          return;
+        }
+
+        mountedCard = card;
+        cardRef.current = card;
+        setIsCardReady(true);
+      } catch (err: any) {
+        console.error('Square SDK init error:', err);
+        if (!cancelled) {
+          setCardError(
+            err?.message ||
+              'No se pudo inicializar el formulario seguro de Square. Verifica tu Application ID y Location ID.'
+          );
+          setIsCardReady(false);
+        }
+      }
+    };
+
+    initSquareCard();
+
+    return () => {
+      cancelled = true;
+      cardRef.current = null;
+      setIsCardReady(false);
+      if (mountedCard) {
+        mountedCard.destroy().catch(() => {});
+      }
+    };
+  }, [isOpen, paymentMethod, orderCompleted]);
 
   const handleProcessCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setCardError(null);
 
     if (!email || !fullName || !phone || !address || !city || !zip) {
-      alert('Por favor, rellene todos los datos obligatorios de contacto y envío.');
+      setCardError('Por favor, rellene todos los datos obligatorios de contacto y envío.');
       return;
     }
 
@@ -248,56 +325,44 @@ ${orderItemsText}
       return;
     }
 
-    // STRICT CARD VALIDATION
-    const cleanCard = cardNumber.replace(/\D/g, '');
-    if (!cleanCard || cleanCard.length < 13) {
-      setCardError('Por favor ingrese el número de tarjeta completo (15 o 16 dígitos).');
+    if (!cardRef.current || !isCardReady) {
+      setCardError('El formulario seguro de tarjeta aún está cargando. Espere un momento.');
       return;
     }
 
-    if (!isValidLuhn(cleanCard)) {
-      setCardError('❌ Tarjeta rechazada: El número de tarjeta es inválido o no existe.');
-      return;
-    }
-
-    const expCheck = isValidExpDate(cardExp);
-    if (!expCheck.valid) {
-      setCardError(`❌ Fecha inválida: ${expCheck.message}`);
-      return;
-    }
-
-    const cleanCvc = cardCvc.replace(/\D/g, '');
-    if (cleanCvc.length < 3 || cleanCvc.length > 4) {
-      setCardError('❌ CVC inválido: Ingrese el código de seguridad de 3 o 4 dígitos.');
-      return;
-    }
-
-    // PAYMENT GATEWAY CHECKOUT FLOW
+    // PAYMENT GATEWAY CHECKOUT FLOW WITH SQUARE TOKENIZATION
     setIsProcessing(true);
 
     try {
+      const tokenResult = await cardRef.current.tokenize();
+      if (tokenResult.status !== 'OK' || !tokenResult.token) {
+        const sdkErrors = tokenResult.errors?.map((err: any) => err.message).join(' • ');
+        throw new Error(sdkErrors || 'Por favor verifica los datos de tu tarjeta e intenta nuevamente.');
+      }
+
+      const sourceId = tokenResult.token;
+      const tokenCardInfo = tokenResult.details?.card;
+
       const orderNumber = `SN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
       let paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       let receiptUrl = `https://sunnsshop.com/receipts/${Date.now()}`;
       let detectedBrand: 'visa' | 'mastercard' | 'amex' = 'visa';
+      let last4 = tokenCardInfo?.last4 || '4242';
 
-      const last4 = cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242';
-      if (cleanCard.startsWith('5') || cleanCard.startsWith('2')) {
-        detectedBrand = 'mastercard';
-      } else if (cleanCard.startsWith('3')) {
-        detectedBrand = 'amex';
-      }
+      const sdkBrand = (tokenCardInfo?.brand || '').toLowerCase();
+      if (sdkBrand.includes('master')) detectedBrand = 'mastercard';
+      else if (sdkBrand.includes('amex') || sdkBrand.includes('american')) detectedBrand = 'amex';
 
-      // Call Square / Bank payment processor
+      // Call Square / Bank payment processor (Server / Netlify Function)
       const sqResponse = await fetch('/api/process-square-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceId: 'cnest:card-nonce-ok',
+          sourceId,
           amount: total,
           currency: 'USD',
           buyerEmail: email,
-          orderNumber: orderNumber,
+          orderNumber,
           note: `SUNNS Shop Order ${orderNumber} - ${fullName}`
         })
       });
@@ -316,13 +381,11 @@ ${orderItemsText}
       if (sqData.paymentId) {
         paymentId = sqData.paymentId;
         receiptUrl = sqData.receiptUrl || receiptUrl;
-        if (sqData.cardDetails?.brand?.toLowerCase().includes('master')) {
-          detectedBrand = 'mastercard';
-        }
+        if (sqData.cardDetails?.last4) last4 = sqData.cardDetails.last4;
+        const apiBrand = (sqData.cardDetails?.brand || '').toLowerCase();
+        if (apiBrand.includes('master')) detectedBrand = 'mastercard';
+        else if (apiBrand.includes('amex') || apiBrand.includes('american')) detectedBrand = 'amex';
       }
-
-      // Short delay for realistic luxury payment processing experience
-      await new Promise(res => setTimeout(res, 900));
 
       const orderItems: OrderItem[] = cart.map(item => ({
         productId: item.product.id,
@@ -717,32 +780,23 @@ ${orderItemsText}
                     </div>
                   </div>
 
-                  {/* Card Fields (If card selected) */}
+                  {/* Card Fields (Square Web Payments SDK) */}
                   {paymentMethod === 'square' && (
                     <div className={`bg-[#faf9f6] border rounded-xl p-4 space-y-3 transition-colors ${cardError ? 'border-red-400 bg-red-50/20' : 'border-[#efeae0]'}`}>
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#1a120e] flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5 text-neutral-800" /> Información de Tarjeta
+                          <Lock className="w-3.5 h-3.5 text-neutral-800" /> Información de Tarjeta (Square)
                         </span>
                         <div className="flex items-center gap-1.5">
-                          {/* Visa Badge */}
-                          <div className={`text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm transition-opacity ${
-                            cardNumber.replace(/\D/g, '').startsWith('4') ? 'bg-blue-900 text-white opacity-100 ring-2 ring-blue-500' : 'bg-neutral-800 text-white opacity-60'
-                          }`}>
+                          <div className="text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm bg-neutral-800 text-white">
                             VISA
                           </div>
-                          {/* Mastercard Badge */}
-                          <div className={`text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm flex items-center gap-0.5 transition-opacity ${
-                            cardNumber.replace(/\D/g, '').startsWith('5') || cardNumber.replace(/\D/g, '').startsWith('2') ? 'bg-neutral-900 text-amber-400 opacity-100 ring-2 ring-amber-500' : 'bg-neutral-800 text-amber-400 opacity-60'
-                          }`}>
+                          <div className="text-[9px] font-extrabold px-2 py-0.5 rounded tracking-tighter uppercase shadow-sm flex items-center gap-0.5 bg-neutral-800 text-amber-400">
                             <span className="w-2 h-2 rounded-full bg-red-500 inline-block opacity-90" />
                             <span className="w-2 h-2 rounded-full bg-amber-500 inline-block -ml-1.5 opacity-90" />
                             MC
                           </div>
-                          {/* Amex Badge */}
-                          <div className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-tighter uppercase shadow-sm transition-opacity ${
-                            cardNumber.replace(/\D/g, '').startsWith('3') ? 'bg-cyan-800 text-white opacity-100 ring-2 ring-cyan-500' : 'bg-neutral-800 text-white opacity-60'
-                          }`}>
+                          <div className="text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-tighter uppercase shadow-sm bg-neutral-800 text-white">
                             AMEX
                           </div>
                         </div>
@@ -756,60 +810,17 @@ ${orderItemsText}
                         </div>
                       )}
 
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Número de Tarjeta *</label>
-                        <input
-                          type="text"
-                          required
-                          value={cardNumber}
-                          onChange={(e) => {
-                            setCardError(null);
-                            const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-                            const formatted = raw.match(/.{1,4}/g)?.join(' ') || raw;
-                            setCardNumber(formatted);
-                          }}
-                          placeholder="4000 1234 5678 9010"
-                          maxLength={19}
-                          className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
-                        />
-                      </div>
+                      {!isCardReady && !cardError && (
+                        <div className="text-xs text-[#1a120e]/60 py-3 text-center">
+                          Cargando formulario seguro de tarjeta Square...
+                        </div>
+                      )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">Vence (MM/AA) *</label>
-                          <input
-                            type="text"
-                            required
-                            value={cardExp}
-                            onChange={(e) => {
-                              setCardError(null);
-                              let val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              if (val.length >= 3) {
-                                val = val.slice(0, 2) + '/' + val.slice(2);
-                              }
-                              setCardExp(val);
-                            }}
-                            placeholder="MM/AA"
-                            maxLength={5}
-                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-bold text-[#1a120e]/60">CVC *</label>
-                          <input
-                            type="password"
-                            required
-                            value={cardCvc}
-                            onChange={(e) => {
-                              setCardError(null);
-                              setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4));
-                            }}
-                            placeholder="CVC"
-                            maxLength={4}
-                            className="w-full bg-white border border-[#efeae0] rounded-lg px-3 py-2 text-xs font-mono text-center text-[#1a120e] focus:outline-none focus:border-[#1a120e]"
-                          />
-                        </div>
-                      </div>
+                      {/* Official Square Web Payments SDK Container */}
+                      <div
+                        id="square-card-container"
+                        className="min-h-[96px] bg-white rounded-lg p-1 border border-[#efeae0]"
+                      />
                     </div>
                   )}
 
@@ -817,7 +828,7 @@ ${orderItemsText}
                   <div className="pt-2">
                     <button
                       type="submit"
-                      disabled={isProcessing}
+                      disabled={isProcessing || (paymentMethod === 'square' && !isCardReady)}
                       className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
                         paymentMethod === 'square'
                           ? 'bg-[#1a120e] text-white hover:bg-black'

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -9,21 +10,42 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || 'EAAAIzTZuUdAnM27rs0frhSA5DHQ8JQY39oKU3s-LTuUVWtETDzWVq6YDEwaDQMep';
-  const SQUARE_LOCATION_ID = process.env.SQUARE_LOCATION_ID || 'LY4YAECWHR432';
-  const SQUARE_API_URL = 'https://connect.squareup.com/v2/payments';
-
   // Square Payment API endpoint
   app.post('/api/process-square-payment', async (req, res) => {
     try {
+      const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
+      const SQUARE_LOCATION_ID =
+        process.env.SQUARE_LOCATION_ID || process.env.VITE_SQUARE_LOCATION_ID || '';
+
+      if (!SQUARE_ACCESS_TOKEN || !SQUARE_LOCATION_ID) {
+        return res.status(500).json({
+          success: false,
+          error:
+            'Configuración incompleta en el servidor: faltan SQUARE_ACCESS_TOKEN o SQUARE_LOCATION_ID.',
+        });
+      }
+
       const { sourceId, amount, currency = 'USD', buyerEmail, orderNumber, note } = req.body;
 
       if (!sourceId) {
         return res.status(400).json({ success: false, error: 'Square source_id (nonce) is required.' });
       }
 
-      const amountCents = Math.round((amount || 10) * 100);
-      const idempotencyKey = 'sq_idemp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      const numericAmount = Number(amount);
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'El monto del pago debe ser mayor a cero.' });
+      }
+
+      const isSandbox =
+        process.env.SQUARE_ENVIRONMENT === 'sandbox' ||
+        (process.env.VITE_SQUARE_APPLICATION_ID || '').startsWith('sandbox-');
+
+      const SQUARE_API_URL = isSandbox
+        ? 'https://connect.squareupsandbox.com/v2/payments'
+        : 'https://connect.squareup.com/v2/payments';
+
+      const amountCents = Math.round(numericAmount * 100);
+      const idempotencyKey = 'sq_idemp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
 
       const payload = {
         source_id: sourceId,
@@ -34,18 +56,16 @@ async function startServer() {
         },
         location_id: SQUARE_LOCATION_ID,
         autocomplete: true,
-        buyer_email_address: buyerEmail || 'customer@sunnsshop.com',
+        buyer_email_address: buyerEmail || undefined,
         note: note || `SUNNS Order #${orderNumber || 'Online'}`
       };
-
-      console.log('Processing Square payment for amount:', amountCents, 'at location:', SQUARE_LOCATION_ID);
 
       const response = await fetch(SQUARE_API_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
-          'Square-Version': '2024-01-18'
+          'Square-Version': '2024-10-17'
         },
         body: JSON.stringify(payload)
       });
@@ -62,22 +82,23 @@ async function startServer() {
           errorMessage = 'Pago rechazado: Fondos insuficientes en la tarjeta.';
         } else if (firstError?.code === 'CARD_DECLINED') {
           errorMessage = 'Pago rechazado: La entidad bancaria ha declinado la transacción.';
-        } else if (firstError?.code === 'CVV_FAILURE') {
+        } else if (firstError?.code === 'CVV_FAILURE' || firstError?.code === 'VERIFY_CVV_FAILURE') {
           errorMessage = 'Pago rechazado: El código CVC de seguridad es incorrecto.';
-        } else if (firstError?.code === 'CARD_EXPIRED') {
-          errorMessage = 'Pago rechazado: La tarjeta ingresada ha expirado.';
+        } else if (firstError?.code === 'CARD_EXPIRED' || firstError?.code === 'INVALID_EXPIRATION') {
+          errorMessage = 'Pago rechazado: La tarjeta ingresada ha expirado o su fecha es inválida.';
         } else if (firstError?.code === 'GENERIC_DECLINE') {
           errorMessage = 'Pago rechazado: Transacción denegada por su banco emisor.';
         } else if (firstError?.code === 'CARD_DECLINED_CALL_ISSUER') {
           errorMessage = 'Pago rechazado: Comuníquese con su banco emisor para autorizar el cobro.';
-        } else if (firstError?.code === 'ADDRESS_VERIFICATION_FAILURE') {
+        } else if (firstError?.code === 'ADDRESS_VERIFICATION_FAILURE' || firstError?.code === 'VERIFY_AVS_FAILURE') {
           errorMessage = 'Pago rechazado: La dirección o código postal no coincide con el registro del banco.';
+        } else if (firstError?.code === 'UNAUTHORIZED') {
+          errorMessage = 'Error de autenticación con Square: verifica tu SQUARE_ACCESS_TOKEN.';
         }
 
         return res.status(400).json({ success: false, error: errorMessage, code: firstError?.code, details: data.errors });
       }
 
-      console.log('Square payment successful:', data.payment?.id);
       return res.json({
         success: true,
         paymentId: data.payment?.id,

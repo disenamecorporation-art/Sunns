@@ -372,17 +372,6 @@ export function normalizeProduct(raw: any): Product {
 }
 
 export async function dbGetProducts(): Promise<Product[]> {
-  // Load any locally cached edits first
-  try {
-    const cached = localStorage.getItem('sunns_products_v4');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memProducts = parsed.map(normalizeProduct);
-      }
-    }
-  } catch {}
-
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
@@ -393,9 +382,6 @@ export async function dbGetProducts(): Promise<Product[]> {
       if (!error && Array.isArray(data) && data.length > 0) {
         const dbFetched: Product[] = data.map((row: any) => normalizeProduct(row));
         memProducts = dbFetched;
-        try {
-          localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
-        } catch {}
         return memProducts;
       }
     } catch (err) {
@@ -403,7 +389,7 @@ export async function dbGetProducts(): Promise<Product[]> {
     }
   }
 
-  // Fallback to in-memory state with persistence
+  // Fallback to memory state
   return memProducts.map(normalizeProduct);
 }
 
@@ -416,11 +402,6 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
   } else {
     memProducts.unshift({ ...normalized });
   }
-
-  // Persist locally immediately
-  try {
-    localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
-  } catch {}
 
   if (isSupabaseConfigured()) {
     // Details array with encoded original price & video metadata to guarantee persistence
@@ -458,14 +439,14 @@ export async function dbSaveProduct(product: Product): Promise<Product> {
       };
       const { error: extErr } = await supabase.from('products').upsert(extendedRow);
       if (extErr) {
-        // Fallback to safeRow that preserves details, colors, images, and description
+        // Fallback to safeRow that preserves details, colors, images, and description directly in Supabase
         const { error: safeErr } = await supabase.from('products').upsert(safeRow);
         if (safeErr) {
-          console.warn('Database save warning (saved locally):', safeErr);
+          console.warn('Database save warning from Supabase:', safeErr);
         }
       }
     } catch (err) {
-      console.warn('Database save exception (saved locally):', err);
+      console.warn('Database save exception:', err);
     }
   }
 
@@ -485,9 +466,6 @@ export async function dbDeleteProduct(productId: string): Promise<boolean> {
   }
 
   memProducts = memProducts.filter(p => p.id !== productId);
-  try {
-    localStorage.setItem('sunns_products_v4', JSON.stringify(memProducts));
-  } catch {}
   return true;
 }
 
@@ -889,36 +867,15 @@ export async function dbLoginUser(email: string, password?: string): Promise<{ s
     cleanUser.tier = 'Black Elite' as any;
   }
   memActiveUser = cleanUser as User;
-  try {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('sunns_session_user', JSON.stringify(memActiveUser));
-    }
-  } catch {}
   return { success: true, user: memActiveUser };
 }
 
 export function dbGetActiveSession(): User | null {
-  if (memActiveUser) return memActiveUser;
-  try {
-    if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem('sunns_session_user');
-      if (stored) {
-        memActiveUser = JSON.parse(stored);
-        return memActiveUser;
-      }
-    }
-  } catch {}
-  return null;
+  return memActiveUser;
 }
 
 export function dbLogoutUser(): void {
   memActiveUser = null;
-  try {
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('sunns_session_user');
-      localStorage.removeItem('sunns_session_user');
-    }
-  } catch {}
 }
 
 export async function dbUpdateUserProfile(userId: string, updates: Partial<User>): Promise<User | null> {
