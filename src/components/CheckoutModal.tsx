@@ -24,14 +24,23 @@ const loadSquareSdk = (appId: string): Promise<any> => {
 
     const isSandbox = appId.startsWith('sandbox-');
     const sdkUrl = isSandbox
-      ? 'https://sandbox.web.squareup.com/v1/square.js'
-      : 'https://web.squareup.com/v1/square.js';
+      ? 'https://sandbox.web.squarecdn.com/v1/square.js'
+      : 'https://web.squarecdn.com/v1/square.js';
 
     const existingScript = document.querySelector(`script[src="${sdkUrl}"]`) as HTMLScriptElement | null;
     if (existingScript) {
-      existingScript.addEventListener('load', () => resolve((window as any).Square));
-      existingScript.addEventListener('error', () => reject(new Error('No se pudo cargar el SDK de Square.')));
-      return;
+      if (existingScript.dataset.failed === 'true') {
+        existingScript.remove();
+      } else {
+        existingScript.addEventListener('load', () => {
+          if ((window as any).Square) resolve((window as any).Square);
+          else reject(new Error('No se pudo inicializar Square.'));
+        });
+        existingScript.addEventListener('error', () =>
+          reject(new Error('No se pudo cargar el formulario seguro de Square.'))
+        );
+        return;
+      }
     }
 
     const script = document.createElement('script');
@@ -44,7 +53,10 @@ const loadSquareSdk = (appId: string): Promise<any> => {
         reject(new Error('Square SDK cargado pero no inicializado.'));
       }
     };
-    script.onerror = () => reject(new Error('No se pudo cargar el formulario seguro de Square.'));
+    script.onerror = () => {
+      script.dataset.failed = 'true';
+      reject(new Error('No se pudo cargar el formulario seguro de Square.'));
+    };
     document.head.appendChild(script);
   });
 };
@@ -180,10 +192,16 @@ export default function CheckoutModal({
             '.input-container.is-focus': {
               borderColor: '#1a120e',
             },
+            '.input-container.is-error': {
+              borderColor: '#dc2626',
+            },
             input: {
               backgroundColor: '#ffffff',
               color: '#1a120e',
-              fontSize: '13px',
+              fontSize: '15px',
+            },
+            'input.is-error': {
+              color: '#dc2626',
             },
           },
         });
